@@ -442,12 +442,31 @@
         <Border Grid.Column="0" Classes="panel">
           <DockPanel>
             <Border Classes="paneHeader" DockPanel.Dock="Top">
-              <Grid ColumnDefinitions="Auto,*,Auto">
+              <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                 <TextBlock Grid.Column="0" Classes="sectionTitle" Text="DOCUMENT" VerticalAlignment="Center" />
+
+                <!-- How the properties of an object are listed. This is a way of looking at the
+                     document; Apply is what writes the order into it. -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"
+                            Margin="14,0,0,0" VerticalAlignment="Center">
+                  <ToggleButton Classes="chip" Content="file order" IsChecked="{Binding IsFileOrder}"
+                                ToolTip.Tip="List properties in the order the file writes them" />
+                  <ToggleButton Classes="chip" Content="A→Z" IsChecked="{Binding IsAscending}"
+                                ToolTip.Tip="List the properties of every object by name, A to Z" />
+                  <ToggleButton Classes="chip" Content="Z→A" IsChecked="{Binding IsDescending}"
+                                ToolTip.Tip="List the properties of every object by name, Z to A" />
+                  <!-- Named for what it applies: the value pane has an Apply of its own, and
+                       two buttons reading "Apply" in one window is one too many. -->
+                  <Button Classes="quiet" Content="Apply order" FontSize="11"
+                          Height="22" Margin="4,0,0,0" VerticalAlignment="Center"
+                          Command="{Binding ApplyOrderCommand}"
+                          IsVisible="{Binding CanApplyOrder}"
+                          ToolTip.Tip="Write this order into the document itself, as an edit you can undo" />
+                </StackPanel>
 
                 <!-- What is currently pinned, and the way back out. Right-clicking a property
                      in the tree is how a name gets in here. -->
-                <ItemsControl Grid.Column="1" ItemsSource="{Binding Pinned.Ordered}"
+                <ItemsControl Grid.Column="2" ItemsSource="{Binding Pinned.Ordered}"
                               Margin="12,0" VerticalAlignment="Center">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -463,7 +482,7 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <Button Grid.Column="2" Classes="quiet" Content="Clear pins" FontSize="11"
+                <Button Grid.Column="3" Classes="quiet" Content="Clear pins" FontSize="11"
                         Height="22" VerticalAlignment="Center"
                         Command="{Binding ClearPinsCommand}"
                         IsVisible="{Binding !Pinned.IsEmpty}" />
@@ -507,6 +526,11 @@
                                   IsEnabled="{Binding CanPin}" />
                         <MenuItem Header="Delete"
                                   Command="{Binding $parent[ListBox].((vm:DocumentSession)DataContext).DeleteSelectedCommand}" />
+                        <Separator />
+                        <MenuItem Header="Sort properties here"
+                                  Command="{Binding $parent[ListBox].((vm:DocumentSession)DataContext).ApplyOrderCommand}"
+                                  CommandParameter="{Binding}"
+                                  IsEnabled="{Binding CanExpand}" />
                       </ContextMenu>
                     </Grid.ContextMenu>
 

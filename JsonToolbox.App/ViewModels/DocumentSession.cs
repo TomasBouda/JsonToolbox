@@ -475,6 +475,116 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
     [RelayCommand]
     private void ClearPins() => Pinned.Clear();
 
+    // ---- The order properties are listed in ---------------------------------------------
+
+    /// <summary>
+    /// How the tree lists the properties of an object.
+    /// </summary>
+    /// <remarks>
+    /// This is a way of looking at the document, not a change to it: the file keeps the order it
+    /// was written in until <see cref="ApplyOrderAsync"/> is asked for. Reading a record whose
+    /// forty keys arrive in the order a serialiser happened to emit them is the case this
+    /// exists for, and wanting to read it that way is not the same as wanting to rewrite it.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFileOrder))]
+    [NotifyPropertyChangedFor(nameof(IsAscending))]
+    [NotifyPropertyChangedFor(nameof(IsDescending))]
+    [NotifyPropertyChangedFor(nameof(CanApplyOrder))]
+    private JsonMemberOrder _memberOrder = JsonMemberOrder.FileOrder;
+
+    // The three chips are one choice, so each is bound to a property that can only be turned
+    // on: clicking the chip that is already lit sets false, which is answered by saying the
+    // value is still true. That is the behaviour of a radio group, without a radio group's
+    // glyph to style away.
+    public bool IsFileOrder
+    {
+        get => MemberOrder == JsonMemberOrder.FileOrder;
+        set => Choose(value, JsonMemberOrder.FileOrder);
+    }
+
+    public bool IsAscending
+    {
+        get => MemberOrder == JsonMemberOrder.Ascending;
+        set => Choose(value, JsonMemberOrder.Ascending);
+    }
+
+    public bool IsDescending
+    {
+        get => MemberOrder == JsonMemberOrder.Descending;
+        set => Choose(value, JsonMemberOrder.Descending);
+    }
+
+    /// <summary>There is nothing to write into the document while the view follows the file.</summary>
+    public bool CanApplyOrder => MemberOrder.IsSorted();
+
+    private void Choose(bool chosen, JsonMemberOrder order)
+    {
+        if (chosen)
+        {
+            MemberOrder = order;
+        }
+        else
+        {
+            // Turning the current choice off would leave no choice at all, so the chip is told
+            // it is still on.
+            OnPropertyChanged(nameof(IsFileOrder));
+            OnPropertyChanged(nameof(IsAscending));
+            OnPropertyChanged(nameof(IsDescending));
+        }
+    }
+
+    partial void OnMemberOrderChanged(JsonMemberOrder value) => _ = RebuildTreeAsync();
+
+    /// <summary>
+    /// Writes the order the tree is showing into the document itself.
+    /// </summary>
+    /// <param name="node">
+    /// The value to reorder, or <c>null</c> for the whole document.
+    /// </param>
+    /// <remarks>
+    /// It is an edit like any other — one step of undo, nothing on disk until Save — because a
+    /// rewrite that reaches every object in the file is exactly the change somebody wants to be
+    /// able to take back.
+    /// </remarks>
+    [RelayCommand]
+    private async Task ApplyOrderAsync(JsonNodeViewModel? node)
+    {
+        if (!CanApplyOrder)
+        {
+            _services.Report("Choose A→Z or Z→A first; there is nothing to apply while the view follows the file.");
+            return;
+        }
+
+        JsonNodeInfo target = node?.Node ?? _document.Root;
+        string what = node is null ? "the document" : node.Header;
+
+        _services.SetBusy(true);
+        _services.Report($"Sorting the properties of {what}…");
+
+        try
+        {
+            EditResult result = await Task
+                .Run(() => _editor.SortMembers(_document, target, MemberOrder))
+                .ConfigureAwait(true);
+
+            if (!result.Applied)
+            {
+                EditError = result.Message ?? "The order could not be applied.";
+                _services.Report(EditError);
+                return;
+            }
+
+            EditError = string.Empty;
+            await RebuildAfterEditAsync().ConfigureAwait(true);
+            _services.Report($"Sorted the properties of {what}. Save to write it to the file.");
+        }
+        finally
+        {
+            _services.SetBusy(false);
+        }
+    }
+
     private async Task ApplyEditAsync(Func<EditResult> edit)
     {
         EditResult result = edit();
@@ -517,12 +627,12 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         List<IReadOnlyList<JsonPathSegment>> open = Tree?.ExpandedPaths() ?? [];
         IReadOnlyList<JsonPathSegment>? selected = SelectedNode?.BuildPath();
 
-        Tree = new JsonTree(_document, Highlight, Pinned);
+        Tree = new JsonTree(_document, Highlight, Pinned, MemberOrder);
         await Tree.ExpandAsync(Tree.Root).ConfigureAwait(true);
 
         foreach (IReadOnlyList<JsonPathSegment> segments in open)
         {
-            await Tree.ExpandPathAsync(segments).ConfigureAwait(true);
+            await Tree.ExpandPathAsync(segments, expandTarget: true).ConfigureAwait(true);
         }
 
         if (selected is not null)

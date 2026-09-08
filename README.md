@@ -109,6 +109,24 @@ the left for what went. Two values side by side answer "did this change"; they d
 "what changed", and for `"Sahakar Nagar"` against `"Sahakar Nagars"` that is one letter nobody
 should have to hunt for.
 
+**Sort properties without touching the file.** A record whose forty keys arrive in whatever
+order a serialiser emitted them is read by hunting, and the fix is usually to look at it
+differently rather than to rewrite it. `A→Z` and `Z→A` in the panel header reorder what the tree
+lists; the document keeps the order it was written in. Array elements are never reordered, in
+the view or otherwise: an element is identified by its position, so moving one would not be a
+different view of the same data — it would be different data, and every index pointing into it
+would be wrong.
+
+When the order should be in the file too, `Apply order` writes it there as an ordinary edit —
+one step of undo however many objects it reached, and nothing on disk until Save. The rewrite is
+a permutation of bytes the document already holds: each member is copied with the exact name,
+colon and value it was written with, so numbers keep their digits and strings keep their
+escapes. What stays still is the separators — the comma, the newline, the indentation of the
+next line — because they belong to the position and not to the member that moves into it. Carry
+each member's trailing comma with it instead and the member that ends up last takes a comma it
+should not have, which is a document that no longer parses. Right-clicking a container sorts
+just that one.
+
 **One session per file.** Everything that belongs to a document — its tree, its search, its
 findings, its pending edits — lives in that document's own session, so opening a second file
 opens a second session rather than swapping the contents of one. Switching tabs changes which

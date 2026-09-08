@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using JsonToolbox.Core.Documents;
+using JsonToolbox.Core.Model;
 
 namespace JsonToolbox.Core.Editing;
 
@@ -129,6 +130,69 @@ public sealed class JsonDocumentEditor(EditableJsonSource source)
         string member = name is null ? json : $"{Quote(name)}:{json}";
         Apply(at, 0, Encoding.UTF8.GetBytes(empty ? member : "," + member));
         return EditResult.Ok();
+    }
+
+    /// <summary>
+    /// Rewrites a value with the properties of every object inside it in the given order.
+    /// </summary>
+    /// <param name="document">
+    /// The document read through this editor's own source, so that the offsets it reports are
+    /// the ones the edit will be applied at.
+    /// </param>
+    /// <remarks>
+    /// The whole value is replaced in one edit, however many objects were reordered inside it,
+    /// so it is one step of undo and not one per object.
+    /// </remarks>
+    public EditResult SortMembers(
+        IndexedJsonDocument document,
+        JsonNodeInfo node,
+        JsonMemberOrder order,
+        CancellationToken cancellationToken = default)
+    {
+        if (!order.IsSorted())
+        {
+            return EditResult.Refused("Choose A→Z or Z→A before applying an order to the document.");
+        }
+
+        if (!node.IsContainer)
+        {
+            return EditResult.Refused("Only an object or an array has members to put in order.");
+        }
+
+        byte[] sorted;
+        try
+        {
+            sorted = JsonMemberSorter.Build(document, node, order, cancellationToken);
+        }
+        catch (MemberSortRefusedException ex)
+        {
+            return EditResult.Refused(ex.Message);
+        }
+
+        long end = node.HasKnownExtent ? node.End : source.Length;
+
+        // Bytes that came back unchanged are not worth an edit: sorting an object that is
+        // already in order would otherwise mark the document modified and offer to save it.
+        if (IsUnchanged(node.Start, end - node.Start, sorted))
+        {
+            return EditResult.Refused("These properties are already in that order.");
+        }
+
+        Apply(node.Start, end - node.Start, sorted);
+        return EditResult.Ok();
+    }
+
+    /// <summary>Whether a range of the document already holds exactly these bytes.</summary>
+    private bool IsUnchanged(long offset, long length, ReadOnlySpan<byte> candidate)
+    {
+        if (length != candidate.Length)
+        {
+            return false;
+        }
+
+        byte[] existing = new byte[candidate.Length];
+        return source.ReadInto(offset, existing, existing.Length) == existing.Length
+            && existing.AsSpan().SequenceEqual(candidate);
     }
 
     public bool Undo()

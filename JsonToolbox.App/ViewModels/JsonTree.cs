@@ -38,11 +38,16 @@ public sealed class JsonTree
 
     private readonly Dictionary<JsonNodeViewModel, ChildState> _states = [];
 
-    public JsonTree(IndexedJsonDocument document, SearchHighlight highlight, PinnedKeys pinned)
+    public JsonTree(
+        IndexedJsonDocument document,
+        SearchHighlight highlight,
+        PinnedKeys pinned,
+        JsonMemberOrder order = JsonMemberOrder.FileOrder)
     {
         Document = document;
         Highlight = highlight;
         Pinned = pinned;
+        Order = order;
 
         Root = new JsonNodeViewModel(this, document.Root, depth: 0);
         Rows.Add(Root);
@@ -53,6 +58,14 @@ public sealed class JsonTree
     public SearchHighlight Highlight { get; }
 
     public PinnedKeys Pinned { get; }
+
+    /// <summary>The order this view lists the properties of an object in.</summary>
+    /// <remarks>
+    /// Fixed for the life of the tree. Choosing a different order is a different view of the
+    /// same document, and the session builds a new tree for it exactly as it does after an
+    /// edit — which is what puts the open nodes and the selection back where they were.
+    /// </remarks>
+    public JsonMemberOrder Order { get; }
 
     public JsonNodeViewModel Root { get; }
 
@@ -201,8 +214,19 @@ public sealed class JsonTree
     /// <summary>
     /// Opens the chain of nodes named by a path and returns the row it ends at.
     /// </summary>
+    /// <param name="expandTarget">
+    /// Whether to open the node the path ends at, as well as the ones leading to it.
+    /// </param>
+    /// <remarks>
+    /// The distinction matters because the two callers want opposite things. Putting the open
+    /// nodes back after the document was rebuilt means opening the node each path names, or the
+    /// deepest level would close every time. Putting the selection back means walking to a value
+    /// and leaving it as it was — selecting a container has never opened it, and rebuilding the
+    /// tree is not the moment to start.
+    /// </remarks>
     public async Task<JsonNodeViewModel?> ExpandPathAsync(
         IReadOnlyList<JsonPathSegment> path,
+        bool expandTarget = false,
         CancellationToken cancellationToken = default)
     {
         JsonNodeViewModel current = Root;
@@ -243,6 +267,11 @@ public sealed class JsonTree
             current = state.Rows[index];
         }
 
+        if (expandTarget && current is { CanExpand: true, IsExpanded: false })
+        {
+            await ExpandAsync(current, cancellationToken).ConfigureAwait(true);
+        }
+
         return current;
     }
 
@@ -269,7 +298,7 @@ public sealed class JsonTree
                 .ConfigureAwait(true);
 
             state.Children.Clear();
-            state.Children.AddRange(indexer.Children);
+            state.Children.AddRange(Arrange(indexer.Children));
 
             var byStart = indexer.Children.ToDictionary(child => child.Start);
             foreach (JsonNodeViewModel row in state.Rows)
@@ -286,6 +315,17 @@ public sealed class JsonTree
             row.RefreshPinState();
         }
     }
+
+    /// <summary>
+    /// Puts a container's children in the order this view shows them.
+    /// </summary>
+    /// <remarks>
+    /// Sorting happens here, once, where the children are read — not when the rows are built.
+    /// Everything downstream, from paging to revealing a search hit, then walks a single list
+    /// whose order is already settled, and cannot disagree with what is on screen.
+    /// </remarks>
+    private IReadOnlyList<JsonNodeInfo> Arrange(IReadOnlyList<JsonNodeInfo> children) =>
+        JsonMemberOrdering.Arrange(children, child => child.Name, Order);
 
     private async Task<ChildState> LoadAsync(JsonNodeViewModel node, CancellationToken cancellationToken)
     {
@@ -304,7 +344,7 @@ public sealed class JsonTree
 
         var state = new ChildState
         {
-            Children = [.. indexer.Children],
+            Children = [.. Arrange(indexer.Children)],
             Truncated = indexer.Truncated,
         };
 
