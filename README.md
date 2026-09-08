@@ -1,6 +1,6 @@
-# JSON Explorer
+# JSON Toolbox
 
-A desktop explorer for JSON files that are too large to open and too messy to trust.
+A desktop toolbox for JSON files that are too large to open and too messy to trust.
 
 Two things set it apart from the viewers that already exist. It is built on a **streaming
 backend**, so a multi-gigabyte file opens instantly and is browsed without ever being held in
@@ -9,7 +9,7 @@ the values that are perfectly legal JSON and will still be misread downstream.
 
 ## What it finds
 
-Syntax errors are the easy part, and the explorer tries to explain them rather than repeat
+Syntax errors are the easy part, and the toolbox tries to explain them rather than repeat
 the parser's complaint — a trailing comma is reported as a trailing comma, not as an
 unexpected `}` several characters later. The same goes for apostrophe-quoted strings,
 comments, `NaN` and `Infinity`, and unquoted keys.
@@ -39,11 +39,11 @@ this file" and "why is it so large" without a query language.
 ## Architecture
 
 ```
-JsonExplorer.Core       parsing, indexing, search, inspection — no UI dependency
-JsonExplorer.App        Avalonia desktop application
+JsonToolbox.Core       parsing, indexing, search, inspection — no UI dependency
+JsonToolbox.App        Avalonia desktop application
   Styles/Tokens.axaml   every colour, once per theme
   Styles/Controls.axaml appearance only, on top of Fluent
-JsonExplorer.Core.Tests
+JsonToolbox.Core.Tests
 ```
 
 Three decisions shape everything else.
@@ -163,11 +163,11 @@ thread was blocked was **10–21 ms**, against 51 ms for the application sitting
 ## Running it
 
 ```bash
-dotnet run --project JsonExplorer.App
+dotnet run --project JsonToolbox.App
 ```
 
 Drop a file on the window, use `Open…`, or pass paths on the command line — every one of them
-opens, so the explorer can serve as the "Open with" handler for `.json` and two files can be
+opens, so the toolbox can serve as the "Open with" handler for `.json` and two files can be
 opened for comparison in one step. `Inspect` runs the full analysis; the search box covers
 keys, values, or both, with regular expressions and whole-word matching.
 

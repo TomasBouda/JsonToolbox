@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>JsonToolbox.Core</AssemblyName>
+    <RootNamespace>JsonToolbox.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>

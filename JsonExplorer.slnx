@@ -1,5 +1,0 @@
-<Solution>
-  <Project Path="JsonExplorer.App/JsonExplorer.App.csproj" />
-  <Project Path="JsonExplorer.Core.Tests/JsonExplorer.Core.Tests.csproj" />
-  <Project Path="JsonExplorer.Core/JsonExplorer.Core.csproj" />
-</Solution>
