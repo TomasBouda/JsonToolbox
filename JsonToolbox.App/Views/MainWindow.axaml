@@ -5,6 +5,7 @@
         x:Class="JsonToolbox.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding Title}"
+        Icon="/Assets/icon.ico"
         Width="1360" Height="860"
         MinWidth="960" MinHeight="620"
         DragDrop.AllowDrop="True">

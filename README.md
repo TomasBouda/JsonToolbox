@@ -39,11 +39,13 @@ this file" and "why is it so large" without a query language.
 ## Architecture
 
 ```
-JsonToolbox.Core       parsing, indexing, search, inspection — no UI dependency
-JsonToolbox.App        Avalonia desktop application
-  Styles/Tokens.axaml   every colour, once per theme
-  Styles/Controls.axaml appearance only, on top of Fluent
+JsonToolbox.Core          parsing, indexing, search, inspection — no UI dependency
+JsonToolbox.App           Avalonia desktop application
+  Styles/Tokens.axaml     every colour, once per theme
+  Styles/Controls.axaml   appearance only, on top of Fluent
+  Assets/icon.ico         the application icon, drawn by the script below
 JsonToolbox.Core.Tests
+tools/generate-icon.ps1   redraws the icon at every size it needs
 ```
 
 Three decisions shape everything else.

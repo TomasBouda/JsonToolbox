@@ -34,6 +34,10 @@ internal static class TextPrompt
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
             ShowInTaskbar = false,
+
+            // Borrowed from the window that opened it, so the dialog does not fall back to the
+            // toolkit's default mark.
+            Icon = owner.Icon,
             Content = new StackPanel
             {
                 Margin = new(20),
