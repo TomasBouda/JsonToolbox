@@ -36,9 +36,25 @@ public static class SyntaxHints
             return "The document ends before the last object or array is closed.";
         }
 
-        if (after[0] == ',' && after.AsSpan(1).TrimStart() is { Length: > 0 } rest && (rest[0] == '}' || rest[0] == ']'))
+        // The last token that parsed cleanly is a value, so what follows it is usually the
+        // comma that separates it from the next one. Stepping over that comma is what lets the
+        // rules below see the actual mistake: `"a": 1, // why` fails on the comment, not on the
+        // comma, and reporting the comma would send the reader to the wrong character.
+        if (after[0] == ',')
         {
-            return $"A comma precedes the closing '{rest[0]}'. JSON does not allow a trailing comma, unlike JavaScript and JSON5.";
+            string beyond = after.AsSpan(1).TrimStart().ToString();
+
+            if (beyond.Length > 0 && beyond[0] is '}' or ']')
+            {
+                return $"A comma precedes the closing '{beyond[0]}'. JSON does not allow a trailing comma, unlike JavaScript and JSON5.";
+            }
+
+            after = beyond;
+        }
+
+        if (after.Length == 0)
+        {
+            return "The document ends just after a comma, with the value that should follow it missing.";
         }
 
         if (after[0] == '\'')
@@ -48,7 +64,8 @@ public static class SyntaxHints
 
         if (after.StartsWith("//", StringComparison.Ordinal) || after.StartsWith("/*", StringComparison.Ordinal))
         {
-            return "The document contains comments, which JSON does not allow. Open it in lenient mode to browse it anyway.";
+            return "The document contains comments, which JSON does not allow. The tree reads it anyway, "
+                + "with comments and trailing commas skipped, but anything consuming it as strict JSON will refuse it.";
         }
 
         foreach (string literal in NonJsonLiterals)

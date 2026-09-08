@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using JsonToolbox.App.ViewModels;
 using JsonToolbox.App.Views;
 
@@ -15,6 +16,16 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var viewModel = new MainWindowViewModel();
+
+            // Last resort. Every operation that can fail reports its own failure, but a bug
+            // that gets past one of them should cost the user a message and not the document
+            // they had open, with whatever they had not saved in it.
+            Dispatcher.UIThread.UnhandledException += (_, e) =>
+            {
+                e.Handled = true;
+                viewModel.StatusText = $"Something went wrong: {e.Exception.Message}";
+            };
+
             desktop.MainWindow = new MainWindow { DataContext = viewModel };
 
             // Paths on the command line open straight away, so the toolbox can be wired up as

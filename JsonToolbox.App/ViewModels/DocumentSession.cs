@@ -5,6 +5,7 @@ using JsonToolbox.Core.Diagnostics;
 using JsonToolbox.Core.Documents;
 using JsonToolbox.Core.Editing;
 using JsonToolbox.Core.Model;
+using JsonToolbox.Core.Scanning;
 using JsonToolbox.Core.Search;
 
 namespace JsonToolbox.App.ViewModels;
@@ -178,9 +179,38 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         // changing the set means re-reading whatever is currently open.
         Pinned.Changed += (_, _) => _ = RefreshPinsAsync();
 
-        Tree = new JsonTree(_document, Highlight, Pinned);
+        // Said before the first read rather than after it, so that anything the read has to
+        // report — a document that is not portable JSON, most of all — is what the user is
+        // left looking at instead of being overwritten by the greeting.
+        _services.Report($"Root is {_document.Root.Kind.ToDisplayName()}. Run Inspect to analyse the whole document.");
+
+        Tree = Build();
         _ = Tree.ExpandAsync(Tree.Root);
     }
+
+    /// <summary>
+    /// A tree over the document as it now stands, wired to say what it finds.
+    /// </summary>
+    /// <remarks>
+    /// Every tree is built here so that none of them can be built without the notices
+    /// connected — the message that a document is not portable JSON is the one thing a reader
+    /// most needs and would otherwise never see.
+    /// </remarks>
+    private JsonTree Build()
+    {
+        var tree = new JsonTree(_document, Highlight, Pinned, MemberOrder);
+
+        tree.Notice += message =>
+        {
+            _services.Report(message);
+            OnPropertyChanged(nameof(IsReadLeniently));
+        };
+
+        return tree;
+    }
+
+    /// <summary>True when the document had to be read with comments and trailing commas allowed.</summary>
+    public bool IsReadLeniently => Tree?.IsLenient == true;
 
     public string Name { get; }
 
@@ -328,6 +358,12 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         catch (ArgumentException ex)
         {
             SearchSummary = $"Invalid pattern: {ex.Message}";
+        }
+        catch (JsonScanException ex)
+        {
+            // Searching reads the whole file, so it meets a syntax error the tree never
+            // reached. What was found before it is still worth showing.
+            SearchSummary = $"Stopped at line {ex.LineNumber}: {ex.Message}";
         }
         catch (OperationCanceledException)
         {
@@ -627,7 +663,7 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         List<IReadOnlyList<JsonPathSegment>> open = Tree?.ExpandedPaths() ?? [];
         IReadOnlyList<JsonPathSegment>? selected = SelectedNode?.BuildPath();
 
-        Tree = new JsonTree(_document, Highlight, Pinned, MemberOrder);
+        Tree = Build();
         await Tree.ExpandAsync(Tree.Root).ConfigureAwait(true);
 
         foreach (IReadOnlyList<JsonPathSegment> segments in open)

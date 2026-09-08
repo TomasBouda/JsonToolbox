@@ -109,6 +109,20 @@ the left for what went. Two values side by side answer "did this change"; they d
 "what changed", and for `"Sahakar Nagar"` against `"Sahakar Nagars"` that is one letter nobody
 should have to hunt for.
 
+**Read what is there, say what is wrong with it.** Configuration files written by hand are full
+of comments and trailing commas, and a reader that refuses them leaves somebody staring at a
+document they can plainly see is there. So the first refusal switches the tree to reading
+leniently, once, for the whole document, and says so — in the status bar and on a chip in the
+panel header, because it changes what the rows below mean. Inspection stays strict: reporting
+that the file is not portable JSON, and explaining that a comment is a comment rather than an
+unexpected `/`, is exactly its job.
+
+A document that is broken beyond that opens the branch onto the reason, at the line and column
+where it stops making sense, and the rest of the tree stays usable. Nothing a file contains is
+allowed to end the process: a syntax error is a thing to be told about, not a thing to fall over,
+and a bug that gets past the operation that should have reported it costs a message rather than
+the document somebody had open with unsaved work in it.
+
 **Sort properties without touching the file.** A record whose forty keys arrive in whatever
 order a serialiser emitted them is read by hunting, and the fix is usually to look at it
 differently rather than to rewrite it. `A→Z` and `Z→A` in the panel header reorder what the tree

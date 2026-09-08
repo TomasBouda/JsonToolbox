@@ -149,7 +149,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Comparison.SyncChoices(Documents);
         ActiveDocument = session;
         IsDiffOpen = false;
-        StatusText = $"Root is {session.Document.Root.Kind.ToDisplayName()}. Run Inspect to analyse the whole document.";
     }
 
     [RelayCommand]

@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JsonToolbox.Core.Diff;
 using JsonToolbox.Core.Documents;
+using JsonToolbox.Core.Scanning;
 
 namespace JsonToolbox.App.ViewModels;
 
@@ -252,6 +253,15 @@ public sealed partial class ComparisonViewModel : ObservableObject
             _report(result.Identical
                 ? $"{left.Name} and {right.Name} are structurally identical."
                 : $"{result.Differences.Count:N0} differences between {left.Name} and {right.Name}.");
+        }
+        catch (JsonScanException ex)
+        {
+            // Comparing parses both sides in full, so a document the tree could show may still
+            // turn out not to be JSON. Saying where beats leaving a half-finished comparison.
+            Differences.Clear();
+            Tree = null;
+            Summary = string.Empty;
+            _report($"Could not compare: line {ex.LineNumber}, {ex.Message}");
         }
         finally
         {

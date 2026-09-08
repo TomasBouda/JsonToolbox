@@ -1,5 +1,6 @@
 using JsonToolbox.Core.Model;
 using JsonToolbox.Core.Documents;
+using JsonToolbox.Core.Scanning;
 
 namespace JsonToolbox.App.ViewModels;
 
@@ -38,6 +39,9 @@ public sealed class JsonTree
 
     private readonly Dictionary<JsonNodeViewModel, ChildState> _states = [];
 
+    /// <summary>How this view reads the document; relaxed once, if the document demands it.</summary>
+    private JsonScanOptions _options = new();
+
     public JsonTree(
         IndexedJsonDocument document,
         SearchHighlight highlight,
@@ -68,6 +72,12 @@ public sealed class JsonTree
     public JsonMemberOrder Order { get; }
 
     public JsonNodeViewModel Root { get; }
+
+    /// <summary>True once the document turned out not to be portable JSON.</summary>
+    public bool IsLenient => _options.Strictness == JsonScanStrictness.Lenient;
+
+    /// <summary>Something the user should be told, in the words to tell them.</summary>
+    public event Action<string>? Notice;
 
     /// <summary>Every row currently visible, in document order.</summary>
     public ObservableRangeCollection<JsonNodeViewModel> Rows { get; } = [];
@@ -289,13 +299,24 @@ public sealed class JsonTree
         {
             ChildState state = _states[node];
 
-            JsonChildIndexer indexer = await Document
-                .IndexChildrenAsync(
-                    node.Node,
-                    maxChildren: IndexLimit,
-                    pinnedKeys: Pinned.Keys,
-                    cancellationToken: cancellationToken)
-                .ConfigureAwait(true);
+            JsonChildIndexer indexer;
+            try
+            {
+                indexer = await Document
+                    .IndexChildrenAsync(
+                        node.Node,
+                        maxChildren: IndexLimit,
+                        pinnedKeys: Pinned.Keys,
+                        options: _options,
+                        cancellationToken: cancellationToken)
+                    .ConfigureAwait(true);
+            }
+            catch (JsonScanException)
+            {
+                // A branch that could not be read has no pinned values to refresh either. It
+                // already says why it is empty, so there is nothing to add.
+                continue;
+            }
 
             state.Children.Clear();
             state.Children.AddRange(Arrange(indexer.Children));
@@ -334,23 +355,80 @@ public sealed class JsonTree
             return existing;
         }
 
-        // A small node is read on the spot: going through a worker would cost more than the
-        // read itself, and it would split the expansion into two layout passes.
-        JsonChildIndexer indexer = node.Node.HasKnownExtent && node.Node.ByteLength <= SynchronousReadLimit
-            ? Document.IndexChildren(node.Node, maxChildren: IndexLimit, pinnedKeys: Pinned.Keys, cancellationToken: cancellationToken)
-            : await Document
-                .IndexChildrenAsync(node.Node, maxChildren: IndexLimit, pinnedKeys: Pinned.Keys, cancellationToken: cancellationToken)
-                .ConfigureAwait(true);
-
-        var state = new ChildState
+        ChildState state;
+        try
         {
-            Children = [.. Arrange(indexer.Children)],
-            Truncated = indexer.Truncated,
-        };
+            JsonChildIndexer indexer = await IndexAsync(node, cancellationToken).ConfigureAwait(true);
+            state = new ChildState
+            {
+                Children = [.. Arrange(indexer.Children)],
+                Truncated = indexer.Truncated,
+            };
+        }
+        catch (JsonScanException ex)
+        {
+            // A document that is not JSON is a thing to be told about, not a thing to fall
+            // over. The branch opens onto the explanation, and the rest of the tree — every
+            // part of the file that does parse — stays usable.
+            state = new ChildState
+            {
+                Children = [],
+                Truncated = false,
+                Error = $"Line {ex.LineNumber}, column {ex.BytePositionInLine + 1}: {ex.Message}",
+            };
+
+            Notice?.Invoke($"{Document.DisplayName} stops being JSON at line {ex.LineNumber}: {ex.Message}");
+        }
 
         _states[node] = state;
         return state;
     }
+
+    /// <summary>
+    /// Reads a container's children, giving up on portable JSON if that is what it takes.
+    /// </summary>
+    /// <remarks>
+    /// Configuration files written by hand are full of comments and trailing commas, and a
+    /// reader that refuses them leaves the user staring at a document they can plainly see is
+    /// there. So the first refusal switches this view to reading leniently and tries again —
+    /// once, for the whole tree — and says so. Inspection stays strict, because reporting that
+    /// the file is not portable JSON is exactly its job.
+    /// </remarks>
+    private async Task<JsonChildIndexer> IndexAsync(JsonNodeViewModel node, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await ReadAsync(node, cancellationToken).ConfigureAwait(true);
+        }
+        catch (JsonScanException) when (_options.Strictness == JsonScanStrictness.Strict)
+        {
+            _options = _options with { Strictness = JsonScanStrictness.Lenient };
+
+            JsonChildIndexer indexer = await ReadAsync(node, cancellationToken).ConfigureAwait(true);
+            Notice?.Invoke(
+                $"{Document.DisplayName} is not portable JSON, so it is being read with comments and "
+                + "trailing commas allowed. Run Inspect to see what is in it.");
+
+            return indexer;
+        }
+    }
+
+    private Task<JsonChildIndexer> ReadAsync(JsonNodeViewModel node, CancellationToken cancellationToken) =>
+        // A small node is read on the spot: going through a worker would cost more than the
+        // read itself, and it would split the expansion into two layout passes.
+        node.Node.HasKnownExtent && node.Node.ByteLength <= SynchronousReadLimit
+            ? Task.FromResult(Document.IndexChildren(
+                node.Node,
+                maxChildren: IndexLimit,
+                pinnedKeys: Pinned.Keys,
+                options: _options,
+                cancellationToken: cancellationToken))
+            : Document.IndexChildrenAsync(
+                node.Node,
+                maxChildren: IndexLimit,
+                pinnedKeys: Pinned.Keys,
+                options: _options,
+                cancellationToken: cancellationToken);
 
     /// <summary>
     /// Inserts the next page of a node's children directly below the rows it already has.
@@ -405,6 +483,13 @@ public sealed class JsonTree
     {
         int remaining = state.Children.Count - state.Shown;
 
+        // The reason a branch has nothing under it belongs under that branch, where whoever
+        // opened it is looking, rather than only in a status bar they have already read past.
+        if (state.Error is { } error)
+        {
+            return JsonNodeViewModel.CreateMoreRow(this, node, error, canShowMore: false);
+        }
+
         if (remaining > 0)
         {
             return JsonNodeViewModel.CreateMoreRow(
@@ -429,6 +514,9 @@ public sealed class JsonTree
         public required List<JsonNodeInfo> Children { get; init; }
 
         public required bool Truncated { get; init; }
+
+        /// <summary>Why there are no children, when the reason is that the document is broken.</summary>
+        public string? Error { get; init; }
 
         /// <summary>How many children have been turned into rows.</summary>
         public int Shown { get; set; }

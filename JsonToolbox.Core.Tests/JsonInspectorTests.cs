@@ -168,6 +168,41 @@ public class JsonInspectorTests
     }
 
     [Fact]
+    public void Explains_a_comment_that_follows_a_value()
+    {
+        // The last good token is the value, so what the reader sees next is the comma. Reporting
+        // that comma would send somebody looking at the wrong character; the mistake is the
+        // comment after it, which is how a configuration file usually carries one.
+        InspectionReport report = Inspect("""
+            {
+              "a": 1, // why
+              "b": 2
+            }
+            """);
+
+        JsonDiagnostic? diagnostic = Find(report, DiagnosticCodes.SyntaxError);
+
+        Assert.NotNull(diagnostic);
+        Assert.Contains("comments", diagnostic.Hint ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Explains_a_comment_on_a_line_of_its_own()
+    {
+        InspectionReport report = Inspect("""
+            {
+              // the database
+              "a": 1
+            }
+            """);
+
+        JsonDiagnostic? diagnostic = Find(report, DiagnosticCodes.SyntaxError);
+
+        Assert.NotNull(diagnostic);
+        Assert.Contains("comments", diagnostic.Hint ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Explains_apostrophe_quoted_strings()
     {
         InspectionReport report = Inspect("{'a': 1}");
