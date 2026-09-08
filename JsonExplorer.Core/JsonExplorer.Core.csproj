@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>JsonExplorer.Core</AssemblyName>
+    <RootNamespace>JsonExplorer.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,7 @@
+{
+  "Movies": [
+    { "ID": 715, "Name": "Swollen in the Trainer", "Year": 2006, "Rate": 7.6, "Sequel": null, "Awarded": true, "Genre": ["Romance"] },
+    { "ID": 716, "Name": "The Quiet Harbour", "Year": 1998, "Rate": 8.1, "Sequel": "Harbour II", "Awarded": false, "Genre": ["Drama"] },
+    { "ID": 717, "Name": "Nightfall Over Brno", "Year": 2014, "Rate": 6.4, "Sequel": null, "Awarded": false, "Genre": ["Thriller", "Crime"] }
+  ]
+}

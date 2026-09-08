@@ -1,0 +1,18 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Single source of truth for the product version. The UI and the diagnostics
+         report read it back from the assembly, so a displayed version can never
+         drift from the build it belongs to. -->
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <Product>JSON Explorer</Product>
+    <Company>Tomas Bouda</Company>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+</Project>

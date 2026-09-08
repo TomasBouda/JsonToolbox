@@ -1,0 +1,21 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="JsonExplorer.App.App"
+             RequestedThemeVariant="Default">
+
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://JsonExplorer/Styles/Tokens.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <Application.Styles>
+    <!-- Fluent stays underneath so that focus visuals, keyboard behaviour and animation
+         remain correct; Controls.axaml only changes how things look. -->
+    <FluentTheme />
+    <StyleInclude Source="avares://JsonExplorer/Styles/Controls.axaml" />
+  </Application.Styles>
+
+</Application>

@@ -1,0 +1,17 @@
+{
+  "orderId": 9007199254740993,
+  "orderid": "duplicate-by-case",
+  "customer_name": "Acme",
+  "customerEmail": "billing@acme.example",
+  "api_key": "sk-live-3f9a2b7c1d8e4056",
+  "middleName": "null",
+  "payload": "{\"doubleEncoded\": true}",
+  "lines": [
+    { "sku": "A-1", "qty": 2, "price": 10.5, "note": "ok" },
+    { "sku": "A-2", "qty": 1, "price": 12.0, "note": "ok" },
+    { "sku": "A-3", "qty": 3, "price": "13.00" },
+    { "sku": "A-4", "qty": 1, "price": 9.25, "note": "ok" }
+  ],
+  "total": 0.1000000000000000055511151231257827,
+  "total": 55.75
+}

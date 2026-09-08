@@ -1,0 +1,5 @@
+[
+  { "Booking_ID": 1, "Pickup_Location": "Sahakar Nagars", "Booking_Value": "3868", "Driver_Ratings": null },
+  { "Booking_ID": 2, "Pickup_Location": "Koramangala", "Booking_Value": "1240", "Driver_Ratings": "4.7" },
+  { "Booking_ID": 3, "Pickup_Location": "Whitefield East", "Booking_Value": "905", "Driver_Ratings": "4.25" }
+]

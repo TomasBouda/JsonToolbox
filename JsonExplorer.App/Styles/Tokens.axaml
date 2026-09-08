@@ -1,0 +1,162 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!--
+    The design tokens for the whole application. Every colour used anywhere in the UI is
+    named here and defined twice, once per theme, so that adding a control never means
+    picking a colour and no screen can end up light-only. Values are grouped by role
+    (surface, text, accent, syntax, severity) rather than by hue, because that is how they
+    are chosen when writing a view.
+  -->
+
+  <ResourceDictionary.ThemeDictionaries>
+
+    <ResourceDictionary x:Key="Light">
+
+      <!-- Surfaces, from the window backdrop up to the raised panels on top of it. -->
+      <SolidColorBrush x:Key="SurfaceCanvas" Color="#F5F6F8" />
+      <SolidColorBrush x:Key="SurfaceBase" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SurfaceRaised" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SurfaceSunken" Color="#EEF0F3" />
+      <SolidColorBrush x:Key="SurfaceHover" Color="#08000000" />
+      <SolidColorBrush x:Key="SurfaceSelected" Color="#1F3B6FF5" />
+
+      <!-- Lines. Strong enough to separate regions, quiet enough not to draw a grid. -->
+      <SolidColorBrush x:Key="BorderSubtle" Color="#E6E8EC" />
+      <SolidColorBrush x:Key="BorderStrong" Color="#D2D6DD" />
+
+      <!-- Text, in the three weights every dense UI needs: content, label, and hint. -->
+      <SolidColorBrush x:Key="TextPrimary" Color="#14161A" />
+      <SolidColorBrush x:Key="TextSecondary" Color="#585F6B" />
+      <SolidColorBrush x:Key="TextTertiary" Color="#8B929E" />
+      <SolidColorBrush x:Key="TextOnAccent" Color="#FFFFFF" />
+
+      <SolidColorBrush x:Key="AccentBase" Color="#3B6FF5" />
+      <SolidColorBrush x:Key="AccentHover" Color="#3364E4" />
+      <SolidColorBrush x:Key="AccentPressed" Color="#2A57C9" />
+      <SolidColorBrush x:Key="AccentSoft" Color="#1A3B6FF5" />
+
+      <!-- Value colouring, the same convention code editors use for JSON. -->
+      <SolidColorBrush x:Key="SyntaxKey" Color="#1F2430" />
+      <SolidColorBrush x:Key="SyntaxString" Color="#A31515" />
+      <SolidColorBrush x:Key="SyntaxNumber" Color="#12763C" />
+      <SolidColorBrush x:Key="SyntaxBoolean" Color="#7A3EAF" />
+      <SolidColorBrush x:Key="SyntaxNull" Color="#9A4B00" />
+      <SolidColorBrush x:Key="SyntaxNullSoft" Color="#1FB06A00" />
+      <SolidColorBrush x:Key="SyntaxContainer" Color="#6E7683" />
+
+      <SolidColorBrush x:Key="SeverityError" Color="#C7292E" />
+      <SolidColorBrush x:Key="SeverityWarning" Color="#B06A00" />
+      <SolidColorBrush x:Key="SeverityInfo" Color="#4C74B8" />
+      <SolidColorBrush x:Key="SeverityErrorSoft" Color="#1AC7292E" />
+      <SolidColorBrush x:Key="SeverityWarningSoft" Color="#1AB06A00" />
+      <SolidColorBrush x:Key="SeverityInfoSoft" Color="#1A4C74B8" />
+
+      <SolidColorBrush x:Key="MeterTrack" Color="#E6E8EC" />
+      <SolidColorBrush x:Key="MeterFill" Color="#803B6FF5" />
+
+      <!-- Search markup. A wash rather than a solid fill, so a marked run stays readable in
+           whatever colour its value already had. -->
+      <SolidColorBrush x:Key="MatchBackground" Color="#66FFD54A" />
+      <SolidColorBrush x:Key="MatchForeground" Color="#14161A" />
+
+      <!-- Diff. Green for what appeared, red for what went, blue for what changed in place. -->
+      <SolidColorBrush x:Key="DiffAdded" Color="#12763C" />
+      <SolidColorBrush x:Key="DiffRemoved" Color="#C7292E" />
+      <SolidColorBrush x:Key="DiffChanged" Color="#2A5DB0" />
+      <SolidColorBrush x:Key="DiffAddedSoft" Color="#1A12763C" />
+      <SolidColorBrush x:Key="DiffRemovedSoft" Color="#1AC7292E" />
+      <SolidColorBrush x:Key="DiffChangedSoft" Color="#1A2A5DB0" />
+
+      <!-- Marks inside a changed value, stronger than the row tint they sit on. -->
+      <SolidColorBrush x:Key="DiffAddedMark" Color="#9912763C" />
+      <SolidColorBrush x:Key="DiffRemovedMark" Color="#99C7292E" />
+
+    </ResourceDictionary>
+
+    <ResourceDictionary x:Key="Dark">
+
+      <SolidColorBrush x:Key="SurfaceCanvas" Color="#121418" />
+      <SolidColorBrush x:Key="SurfaceBase" Color="#1A1D23" />
+      <SolidColorBrush x:Key="SurfaceRaised" Color="#20242B" />
+      <SolidColorBrush x:Key="SurfaceSunken" Color="#15181D" />
+      <SolidColorBrush x:Key="SurfaceHover" Color="#0DFFFFFF" />
+      <SolidColorBrush x:Key="SurfaceSelected" Color="#2E5E8BFF" />
+
+      <SolidColorBrush x:Key="BorderSubtle" Color="#2A2F38" />
+      <SolidColorBrush x:Key="BorderStrong" Color="#3A414C" />
+
+      <SolidColorBrush x:Key="TextPrimary" Color="#E9ECF1" />
+      <SolidColorBrush x:Key="TextSecondary" Color="#A0A8B5" />
+      <SolidColorBrush x:Key="TextTertiary" Color="#6F7784" />
+      <SolidColorBrush x:Key="TextOnAccent" Color="#0E1116" />
+
+      <SolidColorBrush x:Key="AccentBase" Color="#6C93FF" />
+      <SolidColorBrush x:Key="AccentHover" Color="#83A5FF" />
+      <SolidColorBrush x:Key="AccentPressed" Color="#5A82F0" />
+      <SolidColorBrush x:Key="AccentSoft" Color="#266C93FF" />
+
+      <SolidColorBrush x:Key="SyntaxKey" Color="#DDE3EC" />
+      <SolidColorBrush x:Key="SyntaxString" Color="#FF8A80" />
+      <SolidColorBrush x:Key="SyntaxNumber" Color="#5FD48A" />
+      <SolidColorBrush x:Key="SyntaxBoolean" Color="#C79BFF" />
+      <SolidColorBrush x:Key="SyntaxNull" Color="#F0A94A" />
+      <SolidColorBrush x:Key="SyntaxNullSoft" Color="#2EE5A94A" />
+      <SolidColorBrush x:Key="SyntaxContainer" Color="#8A93A1" />
+
+      <SolidColorBrush x:Key="SeverityError" Color="#FF7A7D" />
+      <SolidColorBrush x:Key="SeverityWarning" Color="#E5A94A" />
+      <SolidColorBrush x:Key="SeverityInfo" Color="#8FB3E8" />
+      <SolidColorBrush x:Key="SeverityErrorSoft" Color="#26FF7A7D" />
+      <SolidColorBrush x:Key="SeverityWarningSoft" Color="#26E5A94A" />
+      <SolidColorBrush x:Key="SeverityInfoSoft" Color="#268FB3E8" />
+
+      <SolidColorBrush x:Key="MeterTrack" Color="#2A2F38" />
+      <SolidColorBrush x:Key="MeterFill" Color="#806C93FF" />
+
+      <SolidColorBrush x:Key="MatchBackground" Color="#59B98A00" />
+      <SolidColorBrush x:Key="MatchForeground" Color="#FFF2CC" />
+
+      <SolidColorBrush x:Key="DiffAdded" Color="#5FD48A" />
+      <SolidColorBrush x:Key="DiffRemoved" Color="#FF7A7D" />
+      <SolidColorBrush x:Key="DiffChanged" Color="#7FB3FF" />
+      <SolidColorBrush x:Key="DiffAddedSoft" Color="#265FD48A" />
+      <SolidColorBrush x:Key="DiffRemovedSoft" Color="#26FF7A7D" />
+      <SolidColorBrush x:Key="DiffChangedSoft" Color="#267FB3FF" />
+
+      <SolidColorBrush x:Key="DiffAddedMark" Color="#995FD48A" />
+      <SolidColorBrush x:Key="DiffRemovedMark" Color="#99FF7A7D" />
+
+    </ResourceDictionary>
+
+  </ResourceDictionary.ThemeDictionaries>
+
+  <!--
+    Metrics. One spacing scale and one radius, so that panels, rows and buttons line up
+    without anybody measuring anything.
+  -->
+  <x:Double x:Key="RadiusSmall">4</x:Double>
+  <x:Double x:Key="RadiusMedium">6</x:Double>
+  <CornerRadius x:Key="ControlRadius">6</CornerRadius>
+  <CornerRadius x:Key="ChipRadius">4</CornerRadius>
+  <CornerRadius x:Key="PanelRadius">8</CornerRadius>
+
+  <!-- No font is shipped with the application, so this is a preference list of faces that
+       are already present on the platforms it runs on, ending in the generic family. -->
+  <FontFamily x:Key="MonoFont">Cascadia Mono,Consolas,SF Mono,Menlo,DejaVu Sans Mono,monospace</FontFamily>
+
+  <!-- Icons, as geometry rather than a font, so there is no extra asset to ship or licence. -->
+  <StreamGeometry x:Key="IconFolder">M2.5 4.5A1.5 1.5 0 0 1 4 3h3.2l1.4 1.6H16a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 16 15.6H4a1.5 1.5 0 0 1-1.5-1.5z</StreamGeometry>
+  <StreamGeometry x:Key="IconSearch">M8.5 3a5.5 5.5 0 1 1-3.4 9.8l-2.6 2.6a.9.9 0 0 1-1.3-1.3l2.6-2.6A5.5 5.5 0 0 1 8.5 3m0 1.8a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4</StreamGeometry>
+  <StreamGeometry x:Key="IconInspect">M10 1.5l1.7 4.3 4.3 1.7-4.3 1.7L10 13.5 8.3 9.2 4 7.5l4.3-1.7zM4.2 12.4l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z</StreamGeometry>
+  <StreamGeometry x:Key="IconTheme">M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16m0 1.8v12.4a6.2 6.2 0 0 1 0-12.4</StreamGeometry>
+  <!-- A page silhouette with the corner cut off. Drawn as one filled outline rather than as
+       an outline plus a fold, because PathIcon fills what it is given and a second open
+       subpath comes out as a stray blob rather than as a crease. -->
+  <StreamGeometry x:Key="IconDocument">M5 2 H10.5 L15 6.5 V18 H5 Z</StreamGeometry>
+
+  <!-- A chevron pointing right; the open state rotates it a quarter turn. -->
+  <StreamGeometry x:Key="IconCompare">M3 3 H8 V17 H3 Z M12 3 H17 V17 H12 Z</StreamGeometry>
+  <StreamGeometry x:Key="IconChevron">M3 1 L7 5 L3 9 L1.8 7.8 L4.6 5 L1.8 2.2 Z</StreamGeometry>
+
+</ResourceDictionary>
