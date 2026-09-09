@@ -111,18 +111,28 @@
                       Margin="8,0,4,0"
                       Foreground="{DynamicResource TextTertiary}" />
 
+            <!-- One box for whatever is on screen: it searches the document on a document tab
+                 and narrows the differences on the comparison tab. The modifiers below belong
+                 to searching a file, so they step aside when the comparison is what is being
+                 looked at, where the filter is over what has already been found. -->
             <TextBox Grid.Column="1"
                      Classes="flat"
-                     Watermark="Search keys and values…"
-                     Text="{Binding ActiveDocument.SearchText}"
-                     IsEnabled="{Binding HasDocument}"
+                     Watermark="{Binding SearchWatermark}"
+                     Text="{Binding SearchText}"
+                     IsEnabled="{Binding CanSearch}"
                      VerticalAlignment="Center">
               <TextBox.KeyBindings>
-                <KeyBinding Gesture="Enter" Command="{Binding ActiveDocument.SearchCommand}" />
+                <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
               </TextBox.KeyBindings>
             </TextBox>
 
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+            <TextBlock Grid.Column="2" Classes="caption" Margin="6,0"
+                       Text="{Binding SearchSummary}"
+                       IsVisible="{Binding IsSearchingComparison}"
+                       VerticalAlignment="Center" />
+
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
+                        IsVisible="{Binding !IsSearchingComparison}">
               <ToggleButton Classes="chip" Content="Aa" IsChecked="{Binding ActiveDocument.CaseSensitive}" ToolTip.Tip="Match case" />
               <ToggleButton Classes="chip" Content=".*" IsChecked="{Binding ActiveDocument.UseRegex}" ToolTip.Tip="Regular expression" />
               <ToggleButton Classes="chip" Content="ab|" IsChecked="{Binding ActiveDocument.WholeWord}" ToolTip.Tip="Whole word" />
@@ -136,8 +146,9 @@
                     Content="Find"
                     Height="26"
                     Margin="6,0,0,0"
-                    Command="{Binding ActiveDocument.SearchCommand}"
-                    IsEnabled="{Binding HasDocument}" />
+                    Command="{Binding SearchCommand}"
+                    IsEnabled="{Binding CanSearch}"
+                    IsVisible="{Binding !IsSearchingComparison}" />
           </Grid>
         </Border>
 

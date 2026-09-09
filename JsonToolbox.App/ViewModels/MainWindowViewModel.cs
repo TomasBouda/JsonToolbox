@@ -60,11 +60,30 @@ public sealed partial class MainWindowViewModel : ObservableObject
             message => StatusText = message,
             busy => IsBusy = busy,
             value => Progress = value);
+
+        // The toolbar shows the comparison's search, so what the comparison says about it has
+        // to reach the toolbar.
+        Comparison.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(ComparisonViewModel.SearchSummary)
+                or nameof(ComparisonViewModel.HasResult))
+            {
+                RefreshSearch();
+            }
+        };
     }
 
-    partial void OnActiveDocumentChanged(DocumentSession? value) => RefreshTabs();
+    partial void OnActiveDocumentChanged(DocumentSession? value)
+    {
+        RefreshTabs();
+        RefreshSearch();
+    }
 
-    partial void OnIsDiffOpenChanged(bool value) => RefreshTabs();
+    partial void OnIsDiffOpenChanged(bool value)
+    {
+        RefreshTabs();
+        RefreshSearch();
+    }
 
     /// <summary>
     /// Tells each session whether it is the one on screen.
@@ -83,6 +102,77 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     public bool HasDocument => ActiveDocument is not null;
+
+    // ---- The search box ----------------------------------------------------------------
+
+    /// <summary>
+    /// What the search box holds, which is whatever the thing on screen is being searched for.
+    /// </summary>
+    /// <remarks>
+    /// One box, searching what is in front of you. A document and the comparison are searched in
+    /// genuinely different ways — one reads the file, the other narrows the differences already
+    /// found — but that is a difference in how the answer is arrived at, not in what is being
+    /// asked, and it does not justify a second field somewhere else on the screen. Each view
+    /// keeps its own text, so switching tabs brings back what was being looked for there.
+    /// </remarks>
+    public string SearchText
+    {
+        get => IsDiffOpen ? Comparison.SearchText : ActiveDocument?.SearchText ?? string.Empty;
+        set
+        {
+            if (IsDiffOpen)
+            {
+                Comparison.SearchText = value;
+            }
+            else if (ActiveDocument is { } document)
+            {
+                document.SearchText = value;
+            }
+
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>True while the box narrows the comparison rather than searching a document.</summary>
+    public bool IsSearchingComparison => IsDiffOpen;
+
+    public bool CanSearch => IsDiffOpen ? Comparison.HasResult : HasDocument;
+
+    public string SearchWatermark => IsDiffOpen
+        ? "Filter these differences…"
+        : "Search keys and values…";
+
+    /// <summary>
+    /// What the search left, when that is worth saying. Empty for a document, where the count
+    /// belongs with the results rather than in the toolbar.
+    /// </summary>
+    public string SearchSummary => IsDiffOpen ? Comparison.SearchSummary : string.Empty;
+
+    /// <summary>
+    /// Runs the search, for the views where running it is a separate act.
+    /// </summary>
+    /// <remarks>
+    /// Searching a document reads the whole file, so it waits to be asked. Narrowing a
+    /// comparison works on what is already in memory and happens as the text is typed, which
+    /// leaves Enter with nothing to do — and nothing it should complain about either.
+    /// </remarks>
+    [RelayCommand]
+    private void Search()
+    {
+        if (!IsDiffOpen && ActiveDocument is { } document)
+        {
+            document.SearchCommand.Execute(null);
+        }
+    }
+
+    private void RefreshSearch()
+    {
+        OnPropertyChanged(nameof(SearchText));
+        OnPropertyChanged(nameof(IsSearchingComparison));
+        OnPropertyChanged(nameof(CanSearch));
+        OnPropertyChanged(nameof(SearchWatermark));
+        OnPropertyChanged(nameof(SearchSummary));
+    }
 
     public string Version => AppVersion.Current;
 

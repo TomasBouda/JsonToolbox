@@ -4,6 +4,37 @@ namespace JsonToolbox.App.Tests;
 
 public class StartupOptionsTests
 {
+    [Theory]
+    [InlineData("--help")]
+    [InlineData("-h")]
+    [InlineData("-?")]
+    [InlineData("/?")]
+    public void Recognises_the_ways_of_asking_for_help(string flag)
+    {
+        StartupOptions options = StartupOptions.Parse([flag]);
+
+        Assert.True(options.Help);
+        Assert.Null(options.Problem);
+    }
+
+    [Fact]
+    public void Asking_for_help_is_answered_with_help_whatever_else_is_wrong()
+    {
+        // Somebody who types --help has already said they do not know what to type; complaining
+        // about the rest of the line first would be answering a question they did not ask.
+        StartupOptions options = StartupOptions.Parse(["--compare", "only-one.json", "--help"]);
+
+        Assert.True(options.Help);
+        Assert.Null(options.Problem);
+    }
+
+    [Fact]
+    public void The_help_text_says_how_to_compare()
+    {
+        Assert.Contains("--compare", StartupOptions.HelpText);
+        Assert.Contains("Usage:", StartupOptions.HelpText);
+    }
+
     [Fact]
     public void No_arguments_is_not_a_problem()
     {

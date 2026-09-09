@@ -66,11 +66,14 @@ public partial class App : Application
         if (options.Problem is { } problem)
         {
             viewModel.StatusText = problem;
+            ConsoleOutput.WriteLine(problem);
         }
 
         if (missing.Count > 0)
         {
-            viewModel.StatusText = $"No such file: {string.Join(", ", missing)}.";
+            string message = $"No such file: {string.Join(", ", missing)}.";
+            viewModel.StatusText = message;
+            ConsoleOutput.WriteLine(message);
         }
     }
 }

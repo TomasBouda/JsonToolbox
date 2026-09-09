@@ -89,6 +89,71 @@ public sealed partial class ComparisonViewModel : ObservableObject
     [ObservableProperty]
     private DiffRowViewModel? _selectedDifference;
 
+    /// <summary>
+    /// Narrows both views of the comparison to what mentions this text.
+    /// </summary>
+    /// <remarks>
+    /// One text drives the panes and the list of findings, for the same reason the pairing is
+    /// shared between them: two views of one comparison that disagree about what is in it are
+    /// worse than either view alone.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSearch))]
+    private string _searchText = string.Empty;
+
+    /// <summary>Every difference the comparison found, before the search narrows it.</summary>
+    private readonly List<DiffRowViewModel> _allDifferences = [];
+
+    public bool HasSearch => !string.IsNullOrWhiteSpace(SearchText);
+
+    /// <summary>What the search left, out of what was found.</summary>
+    public string SearchSummary => HasSearch
+        ? $"{Differences.Count:N0} of {_allDifferences.Count:N0}"
+        : string.Empty;
+
+    partial void OnSearchTextChanged(string value)
+    {
+        if (Tree is { } tree)
+        {
+            tree.SearchText = value;
+        }
+
+        ApplySearchToDifferences();
+    }
+
+    private void ApplySearchToDifferences()
+    {
+        Differences.Clear();
+
+        string needle = SearchText.Trim();
+        foreach (DiffRowViewModel difference in _allDifferences)
+        {
+            if (!HasSearch || Mentions(difference, needle))
+            {
+                Differences.Add(difference);
+            }
+        }
+
+        OnPropertyChanged(nameof(SearchSummary));
+    }
+
+    private static bool Mentions(DiffRowViewModel difference, string needle)
+    {
+        return Has(difference.Path) || Has(difference.LeftValue) || Has(difference.RightValue);
+
+        bool Has(string? text) => text is not null && text.Contains(needle, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Drops the result, leaving the two sides and the search as they were.</summary>
+    private void Forget()
+    {
+        _allDifferences.Clear();
+        Differences.Clear();
+        Tree = null;
+        Summary = string.Empty;
+        OnPropertyChanged(nameof(SearchSummary));
+    }
+
     public ComparisonViewModel(
         Func<Task<string?>>? pickFile,
         Action<string> report,
@@ -222,9 +287,7 @@ public sealed partial class ComparisonViewModel : ObservableObject
         {
             // A result outlives its sides only as something to misread, so losing a side clears
             // it and the panel goes back to asking for two documents.
-            Differences.Clear();
-            Tree = null;
-            Summary = string.Empty;
+            Forget();
             return;
         }
 
@@ -239,13 +302,17 @@ public sealed partial class ComparisonViewModel : ObservableObject
                 .CompareAsync(left.Document, right.Document, progress: progress)
                 .ConfigureAwait(true);
 
-            Differences.Clear();
+            _allDifferences.Clear();
             foreach (JsonDifference difference in result.Differences)
             {
-                Differences.Add(new DiffRowViewModel(difference));
+                _allDifferences.Add(new DiffRowViewModel(difference));
             }
 
-            Tree = new JsonDiffTree(left.Document, right.Document);
+            ApplySearchToDifferences();
+
+            // The search outlives the comparison it was typed into, so a new result arrives
+            // already narrowed to what was being looked for rather than throwing it away.
+            Tree = new JsonDiffTree(left.Document, right.Document) { SearchText = SearchText };
             await Tree.ExpandAsync(Tree.Root).ConfigureAwait(true);
             await Tree.ExpandChangesAsync().ConfigureAwait(true);
 
@@ -258,9 +325,7 @@ public sealed partial class ComparisonViewModel : ObservableObject
         {
             // Comparing parses both sides in full, so a document the tree could show may still
             // turn out not to be JSON. Saying where beats leaving a half-finished comparison.
-            Differences.Clear();
-            Tree = null;
-            Summary = string.Empty;
+            Forget();
             _report($"Could not compare: line {ex.LineNumber}, {ex.Message}");
         }
         finally

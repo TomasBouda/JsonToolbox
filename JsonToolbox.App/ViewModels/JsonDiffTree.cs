@@ -186,6 +186,26 @@ public sealed partial class JsonDiffTree : ObservableObject
     [ObservableProperty]
     private bool _changesOnly = true;
 
+    /// <summary>
+    /// Narrows the view to the rows mentioning this text, in a key or in either value.
+    /// </summary>
+    /// <remarks>
+    /// A comparison of two large documents answers "what changed" with hundreds of rows, and the
+    /// question that follows is always narrower than that — what changed about the price, about
+    /// this record, about anything called `id`. This is that second question. It is a filter over
+    /// the differences rather than a search of the two files: what it can hide is what the
+    /// comparison found, which is the set somebody is looking through at this point.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSearch))]
+    private string _searchText = string.Empty;
+
+    /// <summary>How many rows the text was found in, once it has been looked for.</summary>
+    [ObservableProperty]
+    private int _matchCount;
+
+    public bool HasSearch => !string.IsNullOrWhiteSpace(SearchText);
+
     public JsonDiffTree(IndexedJsonDocument left, IndexedJsonDocument right, DiffOptions? options = null)
     {
         _pairing = new JsonDiffPairing(left, right, options);
@@ -285,16 +305,32 @@ public sealed partial class JsonDiffTree : ObservableObject
         for (int i = 0; i < Rows.Count && Rows.Count < maxRows; i++)
         {
             JsonDiffRowViewModel row = Rows[i];
-            if (row is { IsMoreRow: false, State: DiffState.Changed, IsExpanded: false, CanExpand: true })
+            if (row is not { IsMoreRow: false, IsExpanded: false, CanExpand: true })
+            {
+                continue;
+            }
+
+            // A changed container is opened because the change is somewhere inside it. While a
+            // search is on, a whole record that arrived or left is opened as well: whether
+            // anything in it mentions the text cannot be decided without looking, and leaving it
+            // shut would list a container under a search that has nothing to do with it.
+            bool worthOpening = row.State == DiffState.Changed
+                || (HasSearch && row.State != DiffState.Unchanged);
+
+            if (worthOpening)
             {
                 await ExpandAsync(row, cancellationToken).ConfigureAwait(true);
             }
         }
     }
 
-    partial void OnChangesOnlyChanged(bool value)
+    partial void OnChangesOnlyChanged(bool value) => Rebuild();
+
+    partial void OnSearchTextChanged(string value) => Rebuild();
+
+    private void Rebuild()
     {
-        // The filter decides which rows are built, so the tree is rebuilt from the root.
+        // Both filters decide which rows are built, so the tree is built again from the root.
         JsonDiffRowViewModel root = Root;
         Collapse(root);
         _levels.Clear();
@@ -305,6 +341,53 @@ public sealed partial class JsonDiffTree : ObservableObject
     {
         await ExpandAsync(root).ConfigureAwait(true);
         await ExpandChangesAsync().ConfigureAwait(true);
+
+        PruneBranchesWithNothingInThem();
+        MatchCount = Rows.Count(row => !row.IsMoreRow && Matches(row.Pair));
+    }
+
+    /// <summary>Whether a pair mentions the text being searched for.</summary>
+    private bool Matches(JsonDiffPair pair) =>
+        !HasSearch
+        || Contains(pair.Name)
+        || Contains(pair.Left?.Preview)
+        || Contains(pair.Right?.Preview);
+
+    private bool Contains(string? text) =>
+        text is not null && text.Contains(SearchText.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Removes the containers a search opened and then emptied.
+    /// </summary>
+    /// <remarks>
+    /// A container is kept while the rows are built, because whether anything inside it matches
+    /// is not known until it has been opened. Once it has, one that neither matches itself nor
+    /// holds anything that does is a heading over nothing. Walking backwards is what makes one
+    /// pass enough: a container is reached after the children that would have kept it, so
+    /// emptying one empties its parent in time to be seen.
+    /// </remarks>
+    private void PruneBranchesWithNothingInThem()
+    {
+        if (!HasSearch)
+        {
+            return;
+        }
+
+        for (int i = Rows.Count - 1; i > 0; i--)
+        {
+            JsonDiffRowViewModel row = Rows[i];
+
+            if (row.IsMoreRow || !row.IsExpanded || Matches(row.Pair))
+            {
+                continue;
+            }
+
+            bool holdsSomething = i + 1 < Rows.Count && Rows[i + 1].Depth > row.Depth;
+            if (!holdsSomething)
+            {
+                Rows.RemoveRange(i, 1);
+            }
+        }
     }
 
     private async Task<LevelState> LoadAsync(JsonDiffRowViewModel row, CancellationToken cancellationToken)
@@ -358,6 +441,14 @@ public sealed partial class JsonDiffTree : ObservableObject
             // Unchanged values are the bulk of any comparison; hiding them is what makes the
             // changes findable at all.
             if (ChangesOnly && pair.State == DiffState.Unchanged)
+            {
+                continue;
+            }
+
+            // A value has to mention the text to survive a search. A container does not: what is
+            // inside it has not been read yet, so it is kept and emptied afterwards if nothing
+            // in it turned out to match.
+            if (!Matches(pair) && !pair.CanExpand)
             {
                 continue;
             }

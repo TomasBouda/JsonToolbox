@@ -110,6 +110,22 @@ the left for what went. Two values side by side answer "did this change"; they d
 "what changed", and for `"Sahakar Nagar"` against `"Sahakar Nagars"` that is one letter nobody
 should have to hunt for.
 
+**One search box, for whatever is on screen.** A comparison of two large documents answers "what
+changed" with hundreds of rows, and the question that follows is always narrower — what changed
+about the price, about this record, about anything called `id`. So the toolbar's search narrows
+the comparison when the comparison is what you are looking at, and searches the file when a
+document is. The two are arrived at differently — one reads the whole file, the other filters
+differences already found and needs no Find button, so the modifiers and the button step aside —
+but that is a difference in how the answer is reached, not in what is being asked, and it does
+not justify a second field somewhere else on the screen. Each view keeps its own text, so
+switching tabs brings back what was being looked for there.
+
+Narrowing the comparison drives both of its views from the one text, for the same reason they
+share their pairing: the panes and the list of findings cannot be allowed to disagree about what
+is in the comparison. A container is kept while the rows are built, because whether anything
+inside it matches is not known until it has been opened; once opened, one that holds nothing
+matching is a heading over nothing and goes.
+
 **Read what is there, say what is wrong with it.** Configuration files written by hand are full
 of comments and trailing commas, and a reader that refuses them leaves somebody staring at a
 document they can plainly see is there. So the first refusal switches the tree to reading
@@ -210,6 +226,11 @@ matching.
 JsonToolbox before.json after.json --compare
 ```
 
+`--help` prints the usage and exits without opening a window. It writes to the console the
+command was typed in: a windowed program starts without one on Windows, so it borrows its
+parent's — which means the text lands under the prompt the shell has already printed back,
+the way it does for every windowed program that does this.
+
 `--compare` (or `-c`, or `--diff`) opens the two files given and lands on the comparison with
 the diff already run, so a script, a shell alias or a version-control difftool goes from two
 paths to a side-by-side view without a click. Both files are open as tabs as well, and either
@@ -221,6 +242,27 @@ bar rather than failing silently or refusing to start.
 ```bash
 dotnet test
 ```
+
+## Releasing
+
+Pushing a version tag builds the release and publishes it:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+`.github/workflows/release.yml` restores, builds, runs both test projects, and publishes a
+self-contained single-file `win-x64` build, so the download runs on a machine with no .NET on
+it. The archive goes to a GitHub release along with its SHA-256, cut with the `gh` that is on
+the runner rather than a third-party action that would have to be trusted with the token.
+
+The tag has to agree with `VersionPrefix` in `Directory.Build.props`, and the run fails if it
+does not. The application shows its version in the status bar and reads it from the assembly it
+was built into, so a tag saying one thing while the build says another would produce a release
+nobody could identify afterwards. Bumping that one property is what makes a release.
+
+Running the workflow by hand builds and tests everything and keeps the archive as an artifact
+without publishing anything, which is how to check a change to the workflow itself.
 
 ## Not done yet
 

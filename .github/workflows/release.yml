@@ -1,0 +1,112 @@
+# Builds a release when a version tag is pushed.
+#
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# The tag is the trigger, and it has to agree with the version in Directory.Build.props: the
+# application shows its version in the status bar and reads it from the assembly, so a tag that
+# says one thing while the build says another produces a release nobody can identify afterwards.
+# The check below fails the run rather than publishing that.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+  # Runs the whole build without publishing anything, for checking the workflow itself.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Read the version, and check the tag agrees with it
+        id: version
+        shell: pwsh
+        run: |
+          $props = [xml](Get-Content Directory.Build.props)
+          $version = ($props.Project.PropertyGroup.VersionPrefix | Where-Object { $_ }).Trim()
+
+          if (-not $version) {
+              throw "Directory.Build.props has no VersionPrefix to build with."
+          }
+
+          if ($env:GITHUB_REF -like "refs/tags/*") {
+              $tag = $env:GITHUB_REF_NAME -replace "^v", ""
+              if ($tag -ne $version) {
+                  throw "Tag $env:GITHUB_REF_NAME says $tag, Directory.Build.props says $version. Bump one to match the other."
+              }
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Output "Building version $version"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
+      # Self-contained and single-file, so the download runs on a machine with no .NET on it.
+      # The native libraries Avalonia draws with have to be carried inside the executable and
+      # unpacked at startup, which is what IncludeNativeLibrariesForSelfExtract is for.
+      - name: Publish
+        shell: pwsh
+        run: |
+          dotnet publish JsonToolbox.App/JsonToolbox.App.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output publish/win-x64 `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=none `
+            -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $name = "JsonToolbox-${{ steps.version.outputs.version }}-win-x64"
+          Compress-Archive -Path publish/win-x64/* -DestinationPath "$name.zip"
+
+          # A checksum beside the archive, so a download can be shown to be the one that was built.
+          $hash = (Get-FileHash "$name.zip" -Algorithm SHA256).Hash.ToLower()
+          "$hash  $name.zip" | Out-File "$name.zip.sha256" -Encoding ascii
+
+          "package=$name" >> $env:GITHUB_ENV
+
+      - name: Keep the build for a manual run
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.package }}
+          path: |
+            ${{ env.package }}.zip
+            ${{ env.package }}.zip.sha256
+
+      # gh is on the runner already, so the release is cut without a third-party action having
+      # to be trusted with the token.
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            "$env:package.zip" "$env:package.zip.sha256" `
+            --title "JSON Toolbox ${{ steps.version.outputs.version }}" `
+            --generate-notes

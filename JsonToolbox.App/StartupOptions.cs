@@ -17,20 +17,44 @@ namespace JsonToolbox.App;
 /// </remarks>
 /// <param name="Paths">The files to open, in the order they were given.</param>
 /// <param name="Compare">Whether to open the comparison on the two files.</param>
+/// <param name="Help">Whether to print the usage and stop without opening a window.</param>
 /// <param name="Problem">
 /// What was wrong with the command line, or <c>null</c> when it made sense. A problem does not
 /// stop the application: the window opens and says so, because a mistyped argument is not a
 /// reason to give somebody nothing at all.
 /// </param>
-public sealed record StartupOptions(IReadOnlyList<string> Paths, bool Compare, string? Problem)
+public sealed record StartupOptions(IReadOnlyList<string> Paths, bool Compare, bool Help, string? Problem)
 {
-    private const string Usage = "Usage: JsonToolbox [--compare] [file ...]";
+    private const string Usage = "Usage: JsonToolbox [options] [file ...]";
+
+    /// <summary>What <c>--help</c> prints.</summary>
+    public static string HelpText =>
+        $"""
+        JSON Toolbox {AppVersion.Current} - a desktop toolbox for JSON files that are too
+        large to open and too messy to trust.
+
+        {Usage}
+
+        Options:
+          -c, --compare, --diff   Open the two files given side by side, with the
+                                  comparison already run.
+          -h, --help, -?          Print this and exit.
+
+        Examples:
+          JsonToolbox data.json
+          JsonToolbox before.json after.json --compare
+
+        Every path given opens as a tab, so the toolbox can serve as the "Open with"
+        handler for .json. Files of any size are welcome: nothing is read until you
+        look at it.
+        """;
 
     public static StartupOptions Parse(IReadOnlyList<string>? arguments)
     {
         List<string> paths = [];
         List<string> unknown = [];
         bool compare = false;
+        bool help = false;
 
         foreach (string argument in arguments ?? [])
         {
@@ -39,15 +63,20 @@ public sealed record StartupOptions(IReadOnlyList<string> Paths, bool Compare, s
                 continue;
             }
 
-            // Anything that starts with a dash is meant as a switch. A path could in principle
-            // start with one, but treating it as a file and silently opening nothing is the
-            // worse of the two failures: a mistyped switch would go unmentioned.
-            if (argument[0] == '-')
+            // Anything that starts with a dash is meant as a switch, as is the "/?" that a
+            // Windows user reaches for first. A path could in principle start with a dash, but
+            // treating it as a file and silently opening nothing is the worse of the two
+            // failures: a mistyped switch would go unmentioned.
+            if (argument[0] == '-' || argument == "/?")
             {
                 switch (argument.ToLowerInvariant())
                 {
                     case "-c" or "--compare" or "--diff":
                         compare = true;
+                        break;
+
+                    case "-h" or "-?" or "/?" or "--help":
+                        help = true;
                         break;
 
                     default:
@@ -61,11 +90,18 @@ public sealed record StartupOptions(IReadOnlyList<string> Paths, bool Compare, s
             }
         }
 
-        return new StartupOptions(paths, compare, Explain(paths, compare, unknown));
+        return new StartupOptions(paths, compare, help, Explain(paths, compare, help, unknown));
     }
 
-    private static string? Explain(List<string> paths, bool compare, List<string> unknown)
+    private static string? Explain(List<string> paths, bool compare, bool help, List<string> unknown)
     {
+        // Asking for the usage is answered with the usage; nothing else about the line matters
+        // once somebody has said they do not know what to type.
+        if (help)
+        {
+            return null;
+        }
+
         if (unknown.Count > 0)
         {
             return $"Not a known option: {string.Join(", ", unknown)}. {Usage}";
