@@ -45,6 +45,7 @@ JsonToolbox.App           Avalonia desktop application
   Styles/Controls.axaml   appearance only, on top of Fluent
   Assets/icon.ico         the application icon, drawn by the script below
 JsonToolbox.Core.Tests
+JsonToolbox.App.Tests     the command line, and whatever else is logic rather than layout
 tools/generate-icon.ps1   redraws the icon at every size it needs
 ```
 
@@ -201,9 +202,21 @@ dotnet run --project JsonToolbox.App
 ```
 
 Drop a file on the window, use `Open…`, or pass paths on the command line — every one of them
-opens, so the toolbox can serve as the "Open with" handler for `.json` and two files can be
-opened for comparison in one step. `Inspect` runs the full analysis; the search box covers
-keys, values, or both, with regular expressions and whole-word matching.
+opens, so the toolbox can serve as the "Open with" handler for `.json`. `Inspect` runs the full
+analysis; the search box covers keys, values, or both, with regular expressions and whole-word
+matching.
+
+```bash
+JsonToolbox before.json after.json --compare
+```
+
+`--compare` (or `-c`, or `--diff`) opens the two files given and lands on the comparison with
+the diff already run, so a script, a shell alias or a version-control difftool goes from two
+paths to a side-by-side view without a click. Both files are open as tabs as well, and either
+side can be re-pointed at something else afterwards, because it is the same comparison the
+button opens rather than a separate read-only mode. A command line that does not add up — one
+file, an unknown switch, a path that is not there — opens the window and says so in the status
+bar rather than failing silently or refusing to start.
 
 ```bash
 dotnet test

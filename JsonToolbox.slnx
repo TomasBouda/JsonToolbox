@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="JsonToolbox.App.Tests/JsonToolbox.App.Tests.csproj" />
   <Project Path="JsonToolbox.App/JsonToolbox.App.csproj" />
   <Project Path="JsonToolbox.Core.Tests/JsonToolbox.Core.Tests.csproj" />
   <Project Path="JsonToolbox.Core/JsonToolbox.Core.csproj" />

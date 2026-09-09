@@ -252,6 +252,32 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IsDiffOpen = true;
     }
 
+    /// <summary>
+    /// Opens the comparison on the first two documents that are open.
+    /// </summary>
+    /// <remarks>
+    /// This is what <c>--compare</c> on the command line arrives at, so that going from two paths
+    /// in a shell to a side-by-side diff takes no clicks. It is deliberately the same object the
+    /// button opens, with the same two pickers: the comparison that a script set up can be
+    /// re-pointed at something else without starting again.
+    /// </remarks>
+    public void CompareOpenDocuments()
+    {
+        if (Documents.Count < 2)
+        {
+            StatusText = "Comparing needs two documents; open a second one and choose it in the panel.";
+            Compare();
+            return;
+        }
+
+        Comparison.SyncChoices(Documents);
+        Comparison.Left = Comparison.Choices.FirstOrDefault(c => c.Session == Documents[0]);
+        Comparison.Right = Comparison.Choices.FirstOrDefault(c => c.Session == Documents[1]);
+
+        HasComparison = true;
+        IsDiffOpen = true;
+    }
+
     [RelayCommand]
     private void ShowComparison()
     {

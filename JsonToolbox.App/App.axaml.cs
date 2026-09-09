@@ -28,18 +28,49 @@ public partial class App : Application
 
             desktop.MainWindow = new MainWindow { DataContext = viewModel };
 
-            // Paths on the command line open straight away, so the toolbox can be wired up as
-            // the "Open with" handler for .json files. Every path is opened rather than only the
-            // first, so selecting two files and comparing them is one step.
-            foreach (string path in desktop.Args ?? [])
-            {
-                if (File.Exists(path))
-                {
-                    viewModel.OpenPath(path);
-                }
-            }
+            Start(viewModel, StartupOptions.Parse(desktop.Args));
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Acts on the command line: opens what it named, and compares if it asked to.
+    /// </summary>
+    /// <remarks>
+    /// A file that is not there is reported rather than skipped in silence. Whatever the command
+    /// line got wrong is said last, so it is what the status bar is left showing instead of being
+    /// buried under the greeting from the last document that did open.
+    /// </remarks>
+    private static void Start(MainWindowViewModel viewModel, StartupOptions options)
+    {
+        List<string> missing = [];
+
+        foreach (string path in options.Paths)
+        {
+            if (File.Exists(path))
+            {
+                viewModel.OpenPath(path);
+            }
+            else
+            {
+                missing.Add(Path.GetFileName(path));
+            }
+        }
+
+        if (options.Compare)
+        {
+            viewModel.CompareOpenDocuments();
+        }
+
+        if (options.Problem is { } problem)
+        {
+            viewModel.StatusText = problem;
+        }
+
+        if (missing.Count > 0)
+        {
+            viewModel.StatusText = $"No such file: {string.Join(", ", missing)}.";
+        }
     }
 }
