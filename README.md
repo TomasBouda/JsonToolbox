@@ -126,6 +126,22 @@ is in the comparison. A container is kept while the rows are built, because whet
 inside it matches is not known until it has been opened; once opened, one that holds nothing
 matching is a heading over nothing and goes.
 
+**Read a column at a time, not a record at a time.** A tree is how you find your way around a
+document; it is not how anyone reads an array of a million records. The `Table` panel draws one
+as a grid, and what makes it affordable is a scan that already existed. Listing a container's
+children goes one level further down to count each child's contents, and it can pick up named
+values while it is there — the same mechanism that shows a pinned key on every row of the tree.
+So the columns are inferred from the first fifty records, and then every cell of every row comes
+out of one further pass over the array. A hundred-megabyte file of a million records becomes a
+table in under a second.
+
+The columns are the property names in the order the records first mention them, because JSON has
+nothing to declare them with. Only the first fifty are looked at: a serialiser that writes a
+field on record eight million and on none before it is describing an exception, not a column, and
+reading every record to find out would mean reading the whole file to draw the first screen. An
+array whose elements are not all objects has no columns worth drawing, and the panel says so
+rather than showing an empty grid.
+
 **Read what is there, say what is wrong with it.** Configuration files written by hand are full
 of comments and trailing commas, and a reader that refuses them leaves somebody staring at a
 document they can plainly see is there. So the first refusal switches the tree to reading
@@ -204,6 +220,7 @@ A 1.0 GB document of 8.8 million records, on an ordinary desktop:
 | Expand a record 500 MB into the file | 0.2 ms |
 | Full-text search across the whole document | 4.3 s (238 MB/s) |
 | Full inspection: 82 M values, all rules | 11.8 s (87 MB/s) |
+| Table over a 103 MB array of 1 M records | 0.8 s |
 
 Live managed memory stayed at 6.7 MB throughout.
 
@@ -279,7 +296,6 @@ defects.
 
 - Synchronized raw text view alongside the tree, with the search term marked up in it too
   (it is already marked up in the tree, the results list and the value pane)
-- Table view for arrays of like-shaped objects
 - JSONPath and JMESPath queries, beyond the current substring and regex search
 - Three-way merge, and exporting a diff as a patch
 - JSON Schema validation against a supplied schema
@@ -289,6 +305,10 @@ defects.
 - Keeping the undo history across a save. Saving in place means releasing the mapping the
   document is read through and opening the new file, which the recorded snapshots cannot
   survive; keeping them would mean holding the old file open until the application closes.
+- Sorting a value larger than 64 MB. Reordering rewrites the value in memory, which is the one
+  thing the rest of the toolbox never does, so past that size it is refused with a reason rather
+  than attempted. Doing it properly means streaming the rewrite to a temporary file and handing
+  the piece table a slice of that, instead of building the bytes up front.
 - Editing values too large to show as text, and reordering members
 - Keeping each tab's scroll position. Which nodes are open survives a switch because it lives
   in the session, but the view is rebuilt when a tab is shown, so it returns to the top.

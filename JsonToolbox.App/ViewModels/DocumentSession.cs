@@ -511,6 +511,114 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
     [RelayCommand]
     private void ClearPins() => Pinned.Clear();
 
+    // ---- The table ---------------------------------------------------------------------
+
+    /// <summary>Which panel is on screen, so the table is only built when it is being looked at.</summary>
+    [ObservableProperty]
+    private int _selectedPanel;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasTable))]
+    private JsonTableViewModel? _table;
+
+    [ObservableProperty]
+    private string _tableMessage = "Select an array of records in the tree to read it as a table.";
+
+    public bool HasTable => Table is not null;
+
+    /// <summary>The index of the table panel among the tabs beside the tree.</summary>
+    private const int TablePanelIndex = 1;
+
+    partial void OnSelectedPanelChanged(int value) => _ = RefreshTableAsync();
+
+    /// <summary>
+    /// Builds the table for whatever array the selection is in.
+    /// </summary>
+    /// <remarks>
+    /// Only while the table is the panel on screen. Reading an array of eight million records
+    /// costs a pass over the file, and paying that on every click in the tree — for a panel
+    /// nobody is looking at — would make the tree unusable to save a tab switch.
+    /// </remarks>
+    private async Task RefreshTableAsync()
+    {
+        if (SelectedPanel != TablePanelIndex)
+        {
+            return;
+        }
+
+        if (NearestArray(SelectedNode) is not { } row)
+        {
+            Table = null;
+            TableMessage = SelectedNode is null
+                ? "Select an array of records in the tree to read it as a table."
+                : "This value is not inside an array of records.";
+            return;
+        }
+
+        // Already showing this array: rebuilding it would throw away the scroll position to
+        // arrive at the same table.
+        if (Table is { } current && current.Path == JsonPathFormatter.ToJsonPath(row.BuildPath()))
+        {
+            return;
+        }
+
+        _services.SetBusy(true);
+
+        try
+        {
+            string path = JsonPathFormatter.ToJsonPath(row.BuildPath());
+            Table = await JsonTableViewModel.BuildAsync(_document, row.Node, path).ConfigureAwait(true);
+
+            TableMessage = Table is null
+                ? "The elements of this array are not records with the same fields, so there are no columns to draw."
+                : string.Empty;
+        }
+        catch (JsonScanException ex)
+        {
+            Table = null;
+            TableMessage = $"Line {ex.LineNumber}: {ex.Message}";
+        }
+        finally
+        {
+            _services.SetBusy(false);
+        }
+    }
+
+    /// <summary>
+    /// The selected array, or the one the selection sits in.
+    /// </summary>
+    /// <remarks>
+    /// Clicking a field of a record and asking for a table means the table of those records,
+    /// not an error. Walking up from the selection is what turns the one into the other.
+    /// </remarks>
+    private static JsonNodeViewModel? NearestArray(JsonNodeViewModel? from)
+    {
+        for (JsonNodeViewModel? row = from; row is not null; row = row.Parent)
+        {
+            if (row is { IsMoreRow: false } && row.Node.Kind == JsonKind.Array)
+            {
+                return row;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Selects the record a table row stands for, so the tree follows the table.</summary>
+    [RelayCommand]
+    private async Task RevealTableRowAsync(TableRowViewModel? row)
+    {
+        if (row is null || Tree is not { } tree)
+        {
+            return;
+        }
+
+        if (await tree.RevealAsync(row.Node.Start).ConfigureAwait(true) is { } found)
+        {
+            SelectedNode = found;
+        }
+    }
+
     // ---- The order properties are listed in ---------------------------------------------
 
     /// <summary>
@@ -728,6 +836,8 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
 
         // A truncated rendering must not be writable: applying it would delete the rest.
         CanEditValue = node.HasKnownExtent && node.ByteLength <= EditableValueLimit;
+
+        _ = RefreshTableAsync();
 
         _ = UpdateLineNumberAsync(node.Start);
     }

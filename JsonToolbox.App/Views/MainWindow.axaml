@@ -627,7 +627,7 @@
         <!-- ============================================================ Side panels -->
 
         <Border Grid.Column="2" Classes="panel">
-          <TabControl>
+          <TabControl SelectedIndex="{Binding SelectedPanel}">
 
             <!-- ................................................................ Value -->
             <TabItem Header="Value">
@@ -733,6 +733,122 @@
                            IsVisible="{Binding CanEditValue}"
                            AcceptsReturn="True" TextWrapping="NoWrap" />
                 </Panel>
+              </DockPanel>
+            </TabItem>
+
+            <!-- ................................................................ Table -->
+            <TabItem Header="Table">
+              <DockPanel>
+
+                <Border DockPanel.Dock="Top" Padding="14,10"
+                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1"
+                        IsVisible="{Binding HasTable}">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                      <TextBlock Classes="path" Text="{Binding Table.Path}" />
+                      <TextBlock Classes="caption" Text="{Binding Table.Summary}" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+
+                <Border DockPanel.Dock="Bottom" Padding="14,8"
+                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,1,0,0"
+                        IsVisible="{Binding Table.HasMore}">
+                  <!-- The label is a TextBlock rather than the button's Content: bound to
+                       Content it measured as nothing and the button came out sixteen pixels
+                       wide, holding text that was there and invisible. -->
+                  <Button Classes="quiet" Height="24"
+                          Command="{Binding Table.ShowMoreCommand}"
+                          HorizontalAlignment="Left">
+                    <TextBlock FontSize="11" Text="{Binding Table.MoreText}" VerticalAlignment="Center" />
+                  </Button>
+                </Border>
+
+                <Panel>
+                  <TextBlock Classes="secondary" MaxWidth="340"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"
+                             TextAlignment="Center" TextWrapping="Wrap"
+                             Text="{Binding TableMessage}"
+                             IsVisible="{Binding !HasTable}" />
+
+                  <!-- Header and rows scroll together in one horizontal viewer, and the columns
+                       are a fixed width apiece, so the two line up without a shared grid that
+                       would have to be kept in step. -->
+                  <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                VerticalScrollBarVisibility="Disabled"
+                                IsVisible="{Binding HasTable}">
+                    <DockPanel>
+
+                      <Border DockPanel.Dock="Top" Classes="tablehead">
+                        <StackPanel Orientation="Horizontal">
+                          <TextBlock Classes="tablecorner" Text="#" />
+                          <ItemsControl ItemsSource="{Binding Table.Columns}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:TableColumnViewModel">
+                                <TextBlock Classes="tableheadcell"
+                                           Width="{Binding Width}"
+                                           Text="{Binding Name}"
+                                           TextTrimming="CharacterEllipsis" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </Border>
+
+                      <ListBox ItemsSource="{Binding Table.Rows}"
+                               SelectedItem="{Binding Table.SelectedRow}"
+                               Classes="rows">
+                        <ListBox.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <VirtualizingStackPanel />
+                          </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                          <DataTemplate x:DataType="vm:TableRowViewModel">
+                            <StackPanel Orientation="Horizontal" Background="Transparent">
+                              <StackPanel.ContextMenu>
+                                <ContextMenu>
+                                  <MenuItem Header="Show this record in the tree"
+                                            Command="{Binding $parent[ListBox].((vm:DocumentSession)DataContext).RevealTableRowCommand}"
+                                            CommandParameter="{Binding}" />
+                                </ContextMenu>
+                              </StackPanel.ContextMenu>
+
+                              <TextBlock Classes="tablecorner" Text="{Binding Label}" />
+                              <ItemsControl ItemsSource="{Binding Cells}">
+                                <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                  </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="vm:TableCellViewModel">
+                                    <TextBlock Classes="value tablecell"
+                                               Classes.string="{Binding IsString}"
+                                               Classes.number="{Binding IsNumber}"
+                                               Classes.boolean="{Binding IsBoolean}"
+                                               Classes.nullvalue="{Binding IsNull}"
+                                               Classes.container="{Binding IsContainerKind}"
+                                               Width="{Binding Width}"
+                                               Text="{Binding Text}"
+                                               TextTrimming="CharacterEllipsis" />
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                            </StackPanel>
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                      </ListBox>
+
+                    </DockPanel>
+                  </ScrollViewer>
+                </Panel>
+
               </DockPanel>
             </TabItem>
 

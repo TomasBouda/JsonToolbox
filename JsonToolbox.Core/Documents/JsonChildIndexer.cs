@@ -54,7 +54,7 @@ public sealed class JsonChildIndexer : JsonScanVisitor
     private long _openNameEnd = -1;
     private int _openChildCount;
     private string? _pendingPinnedKey;
-    private List<string>? _openPinned;
+    private List<KeyValuePair<string, string>>? _openPinned;
 
     /// <param name="onChildFound">
     /// Called the moment a child is discovered. For a container this happens at its opening
@@ -196,7 +196,7 @@ public sealed class JsonChildIndexer : JsonScanVisitor
 
         _pendingPinnedKey = null;
         _openPinned ??= [];
-        _openPinned.Add($"{key}: {Describe(ref reader)}");
+        _openPinned.Add(new KeyValuePair<string, string>(key, Describe(ref reader)));
     }
 
     private static string Describe(ref Utf8JsonReader reader) => reader.TokenType switch
@@ -247,7 +247,7 @@ public sealed class JsonChildIndexer : JsonScanVisitor
         {
             NameStart = _openNameStart,
             NameEnd = _openNameEnd,
-            PinnedSummary = _openPinned is { Count: > 0 } ? string.Join("   ", _openPinned) : null,
+            PinnedValues = _openPinned is { Count: > 0 } ? _openPinned : null,
         };
 
         _children.Add(completed);

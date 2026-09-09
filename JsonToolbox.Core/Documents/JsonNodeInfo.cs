@@ -54,15 +54,40 @@ public readonly record struct JsonNodeInfo(
     public bool HasNamePosition => NameStart >= 0 && NameEnd > NameStart;
 
     /// <summary>
-    /// The pinned properties of this value, rendered for display, or <c>null</c> when nothing
-    /// is pinned or this value has none of the pinned keys.
+    /// The asked-for properties of this value, in the order the document writes them, or
+    /// <c>null</c> when none were asked for or this value has none of them.
     /// </summary>
     /// <remarks>
-    /// Filled in by the same scan that lists a container's children, so pinning a key costs
+    /// Filled in by the same scan that lists a container's children, so asking for them costs
     /// no extra reading: the scan is already inside each child, one level down, counting its
-    /// contents.
+    /// contents. This is what lets a pinned key show on every row of a container, and what lets
+    /// a whole table of records be read in a single pass over the file.
     /// </remarks>
-    public string? PinnedSummary { get; init; }
+    public IReadOnlyList<KeyValuePair<string, string>>? PinnedValues { get; init; }
+
+    /// <summary>Those same properties as one line, for a tree row that has no columns.</summary>
+    public string? PinnedSummary => PinnedValues is { Count: > 0 } values
+        ? string.Join("   ", values.Select(pair => $"{pair.Key}: {pair.Value}"))
+        : null;
+
+    /// <summary>The value of one asked-for property, or <c>null</c> when this value has no such property.</summary>
+    public string? PinnedValue(string key)
+    {
+        if (PinnedValues is null)
+        {
+            return null;
+        }
+
+        foreach (KeyValuePair<string, string> pair in PinnedValues)
+        {
+            if (pair.Key == key)
+            {
+                return pair.Value;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>The byte offset doubles as a stable identity: no two values start at the same byte.</summary>
     public long Id => Start;
