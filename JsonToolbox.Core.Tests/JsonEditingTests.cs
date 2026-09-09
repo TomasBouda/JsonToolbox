@@ -144,6 +144,43 @@ public class JsonEditingTests
     }
 
     [Fact]
+    public void A_new_name_keeps_the_letters_it_was_typed_with()
+    {
+        (JsonDocumentEditor editor, EditableJsonSource source) = Open("""{"a":1}""");
+
+        // Escaping these into \uXXXX would be valid JSON and unreadable in a document somebody
+        // is going to look at.
+        editor.RenameProperty(Child(source, "a"), "příjmení / 名前");
+
+        Assert.Equal("""{"příjmení / 名前":1}""", TextOf(source));
+        AssertStillValid(source);
+    }
+
+    [Fact]
+    public void A_control_character_with_no_shorthand_goes_out_as_a_numeric_escape()
+    {
+        (JsonDocumentEditor editor, EditableJsonSource source) = Open("""{"a":1}""");
+
+        // A bell character: legal in a name, and something JSON can carry no other way.
+        editor.RenameProperty(Child(source, "a"), "bell" + (char)7);
+
+        Assert.Equal("{\"bell\\u0007\":1}", TextOf(source));
+        AssertStillValid(source);
+    }
+
+    [Fact]
+    public void A_new_name_escapes_the_characters_JSON_has_no_other_way_to_carry()
+    {
+        (JsonDocumentEditor editor, EditableJsonSource source) = Open("""{"a":1}""");
+
+        editor.RenameProperty(Child(source, "a"), "line\nbreak\ttab\\slash");
+
+        Assert.Equal("""{"line\nbreak\ttab\\slash":1}""", TextOf(source));
+        AssertStillValid(source);
+    }
+
+
+    [Fact]
     public void An_array_element_has_no_name_to_rename()
     {
         (JsonDocumentEditor editor, EditableJsonSource source) = Open("[1,2,3]");

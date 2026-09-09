@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using JsonToolbox.Core.Documents;
@@ -306,21 +307,69 @@ public sealed class JsonDocumentEditor(EditableJsonSource source)
     }
 
     /// <summary>
-    /// The encoder used for names the user typed.
+    /// Writes a string as JSON, escaping whatever needs it and nothing else.
     /// </summary>
     /// <remarks>
-    /// The default one escapes a quote as <c>"</c> and mangles anything non-Latin, which
-    /// is correct but unreadable in a document a person is going to look at. The relaxed
-    /// encoder still escapes what JSON requires — quotes, backslashes, control characters —
-    /// and leaves the rest as typed.
+    /// <para>
+    /// Exactly what JSON requires is escaped — the quote, the backslash, the control characters
+    /// — and everything else is left as it was typed. A serializer's default encoder would also
+    /// turn every non-Latin character into a <c>\uXXXX</c> escape, which is correct and
+    /// unreadable in a document somebody is going to look at.
+    /// </para>
+    /// <para>
+    /// Written out rather than handed to <c>JsonSerializer</c>, which for a single string is a
+    /// reflection-based API brought in to do a job of a dozen lines — and one the trimmer cannot
+    /// prove safe, which is the difference between a release that can be trimmed and one that
+    /// cannot.
+    /// </para>
     /// </remarks>
-    private static readonly JsonSerializerOptions NameEncoding = new()
+    private static string Quote(string text)
     {
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
+        var quoted = new StringBuilder(text.Length + 2);
+        quoted.Append('"');
 
-    /// <summary>Writes a string as JSON, escaping whatever needs it.</summary>
-    private static string Quote(string text) => JsonSerializer.Serialize(text, NameEncoding);
+        foreach (char character in text)
+        {
+            switch (character)
+            {
+                case '"':
+                    quoted.Append("\\\"");
+                    break;
+                case '\\':
+                    quoted.Append("\\\\");
+                    break;
+                case '\b':
+                    quoted.Append("\\b");
+                    break;
+                case '\f':
+                    quoted.Append("\\f");
+                    break;
+                case '\n':
+                    quoted.Append("\\n");
+                    break;
+                case '\r':
+                    quoted.Append("\\r");
+                    break;
+                case '\t':
+                    quoted.Append("\\t");
+                    break;
+                default:
+                    if (character < 0x20)
+                    {
+                        quoted.Append(CultureInfo.InvariantCulture, $"\\u{(int)character:x4}");
+                    }
+                    else
+                    {
+                        quoted.Append(character);
+                    }
+
+                    break;
+            }
+        }
+
+        quoted.Append('"');
+        return quoted.ToString();
+    }
 
     /// <summary>
     /// Widens a deletion to take the comma that separated the member from its neighbours.

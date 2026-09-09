@@ -63,6 +63,12 @@ jobs:
       # Self-contained and single-file, so the download runs on a machine with no .NET on it.
       # The native libraries Avalonia draws with have to be carried inside the executable and
       # unpacked at startup, which is what IncludeNativeLibrariesForSelfExtract is for.
+      #
+      # Trimming halves the download — 46 MB to 20 — by leaving out the framework this
+      # application never calls. It is safe here because the bindings are compiled rather than
+      # resolved by reflection, and because nothing in the code asks the trimmer to keep types
+      # it cannot see: the one thing that did, a serializer used to escape a property name, is
+      # now a dozen lines that escape it directly.
       - name: Publish
         shell: pwsh
         run: |
@@ -74,6 +80,7 @@ jobs:
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:EnableCompressionInSingleFile=true `
+            -p:PublishTrimmed=true `
             -p:DebugType=none `
             -p:Version=${{ steps.version.outputs.version }}
 

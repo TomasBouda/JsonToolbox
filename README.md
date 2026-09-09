@@ -256,6 +256,14 @@ self-contained single-file `win-x64` build, so the download runs on a machine wi
 it. The archive goes to a GitHub release along with its SHA-256, cut with the `gh` that is on
 the runner rather than a third-party action that would have to be trusted with the token.
 
+Self-contained means the runtime travels with the application, and compressing the single file
+brings that to 46 MB. Trimming takes it to **20 MB** by leaving out the framework this
+application never calls, which is worth having and is only safe because of two things: the
+bindings are compiled rather than resolved by reflection, and nothing in the code asks the
+trimmer to keep types it cannot see. The one place that did was a serializer used to escape a
+property name — a reflection-based API doing a job of a dozen lines, which is now those dozen
+lines.
+
 The tag has to agree with `VersionPrefix` in `Directory.Build.props`, and the run fails if it
 does not. The application shows its version in the status bar and reads it from the assembly it
 was built into, so a tag saying one thing while the build says another would produce a release
