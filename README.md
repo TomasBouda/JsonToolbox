@@ -126,6 +126,20 @@ is in the comparison. A container is kept while the rows are built, because whet
 inside it matches is not known until it has been opened; once opened, one that holds nothing
 matching is a heading over nothing and goes.
 
+**A file of documents is not a document.** JSON Lines writes a record per line with nothing
+wrapping them. Read as a single document such a file yields its first record and nothing else —
+no error, no mention of the rest — which for a tool whose whole claim is that you can trust what
+it shows is worse than refusing to open it. So a file that holds a sequence gets a stand-in root
+that behaves like an array of its records, and says so on a chip in the panel header.
+
+Telling the two apart cannot mean reading the file, because the question is asked when a document
+is opened and opening is meant to cost milliseconds whatever the size. Only the head is read: if
+a complete value ends inside it and something follows, the file is a sequence; if the first value
+has not finished by the end of the head, it is one large document, because a gigabyte-long record
+on a single line is not JSON Lines whatever the extension says. Nothing below the top level needs
+to know any of this — a record is an ordinary document once the scan starts at its own first
+byte — and a log of a million lines becomes a table like any other array.
+
 **Read a column at a time, not a record at a time.** A tree is how you find your way around a
 document; it is not how anyone reads an array of a million records. The `Table` panel draws one
 as a grid, and what makes it affordable is a scan that already existed. Listing a container's
@@ -301,7 +315,6 @@ defects.
 - JSON Schema validation against a supplied schema
 - Decoding of embedded formats in place: base64, JWT, timestamps, URL encoding
 - Redaction mode for sharing, and type generation for C# and TypeScript
-- NDJSON / JSON Lines support
 - Keeping the undo history across a save. Saving in place means releasing the mapping the
   document is read through and opening the new file, which the recorded snapshots cannot
   survive; keeping them would mean holding the old file open until the application closes.

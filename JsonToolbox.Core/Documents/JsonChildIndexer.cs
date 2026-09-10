@@ -29,8 +29,9 @@ namespace JsonToolbox.Core.Documents;
 /// </remarks>
 public sealed class JsonChildIndexer : JsonScanVisitor
 {
-    private const int ChildDepth = 1;
-    private const int GrandchildDepth = 2;
+    private readonly int _childDepth;
+    private readonly int _grandchildDepth;
+    private readonly bool _hasContainer;
 
     private readonly List<JsonNodeInfo> _children = [];
     private readonly Action<JsonNodeInfo>? _onChildFound;
@@ -69,16 +70,27 @@ public sealed class JsonChildIndexer : JsonScanVisitor
     /// Property names to read out of each container child, so the parent row can show them
     /// without being expanded.
     /// </param>
+    /// <param name="sequence">
+    /// True when what is being indexed is a file of documents rather than a container — JSON
+    /// Lines and its relatives. Everything then sits one level shallower: the records are the
+    /// values at depth zero, and there is no closing bracket to stop at, only the end of the
+    /// file.
+    /// </param>
     public JsonChildIndexer(
         Action<JsonNodeInfo>? onChildFound = null,
         int maxChildren = int.MaxValue,
         Action<JsonNodeInfo>? onChildCompleted = null,
-        IReadOnlySet<string>? pinnedKeys = null)
+        IReadOnlySet<string>? pinnedKeys = null,
+        bool sequence = false)
     {
         _onChildFound = onChildFound;
         _onChildCompleted = onChildCompleted;
         _maxChildren = maxChildren;
         _pinnedKeys = pinnedKeys is { Count: > 0 } ? pinnedKeys : null;
+
+        _childDepth = sequence ? 0 : 1;
+        _grandchildDepth = sequence ? 1 : 2;
+        _hasContainer = !sequence;
     }
 
     public IReadOnlyList<JsonNodeInfo> Children => _children;
@@ -100,19 +112,19 @@ public sealed class JsonChildIndexer : JsonScanVisitor
     {
         int depth = reader.CurrentDepth;
 
-        if (depth == 0 && reader.TokenType is JsonTokenType.EndObject or JsonTokenType.EndArray)
+        if (_hasContainer && depth == 0 && reader.TokenType is JsonTokenType.EndObject or JsonTokenType.EndArray)
         {
             ContainerClosed = true;
             return;
         }
 
-        if (depth == GrandchildDepth && _inContainerChild)
+        if (depth == _grandchildDepth && _inContainerChild)
         {
             OnGrandchildToken(ref reader);
             return;
         }
 
-        if (depth != ChildDepth)
+        if (depth != _childDepth)
         {
             return;
         }

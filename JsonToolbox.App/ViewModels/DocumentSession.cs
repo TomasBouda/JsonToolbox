@@ -182,7 +182,7 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         // Said before the first read rather than after it, so that anything the read has to
         // report — a document that is not portable JSON, most of all — is what the user is
         // left looking at instead of being overwritten by the greeting.
-        _services.Report($"Root is {_document.Root.Kind.ToDisplayName()}. Run Inspect to analyse the whole document.");
+        _services.Report(Greeting());
 
         Tree = Build();
         _ = Tree.ExpandAsync(Tree.Root);
@@ -211,6 +211,24 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
 
     /// <summary>True when the document had to be read with comments and trailing commas allowed.</summary>
     public bool IsReadLeniently => Tree?.IsLenient == true;
+
+    /// <summary>True when the file holds a sequence of documents rather than one.</summary>
+    public bool IsSequence => _document.IsSequence;
+
+    /// <summary>
+    /// How the whole file is read by the operations that read all of it.
+    /// </summary>
+    /// <remarks>
+    /// Whether a file is a sequence of documents is settled when it is opened, and searching and
+    /// inspecting have to be told: left to themselves they would stop at the first record, which
+    /// is the one thing this format must never be allowed to do quietly.
+    /// </remarks>
+    private JsonScanOptions ScanOptions => new() { AllowMultipleValues = _document.IsSequence };
+
+    /// <summary>What the status bar says about a document that has just been opened.</summary>
+    private string Greeting() => _document.IsSequence
+        ? "This file is a sequence of documents, one after another, and is shown as a list of them."
+        : $"Root is {_document.Root.Kind.ToDisplayName()}. Run Inspect to analyse the whole document.";
 
     public string Name { get; }
 
@@ -266,7 +284,7 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         {
             var progress = new Progress<double>(_services.SetProgress);
             InspectionReport report = await JsonInspection
-                .InspectAsync(_document.Source, progress: progress)
+                .InspectAsync(_document.Source, progress: progress, scan: ScanOptions)
                 .ConfigureAwait(true);
 
             Diagnostics.Clear();
@@ -343,7 +361,7 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         {
             var progress = new Progress<double>(_services.SetProgress);
             SearchResult result = await JsonSearchEngine
-                .SearchAsync(_document.Source, query, progress: progress, cancellationToken: token)
+                .SearchAsync(_document.Source, query, progress: progress, scan: ScanOptions, cancellationToken: token)
                 .ConfigureAwait(true);
 
             foreach (SearchHit hit in result.Hits)

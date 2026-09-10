@@ -303,6 +303,7 @@ public static class JsonSearchEngine
         SearchQuery query,
         Action<SearchHit>? onHit = null,
         IProgress<double>? progress = null,
+        JsonScanOptions? scan = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -329,7 +330,9 @@ public static class JsonSearchEngine
             bytesScanned = JsonScanner.Scan(
                 stream,
                 visitor,
-                options: new JsonScanOptions { Strictness = JsonScanStrictness.Lenient },
+                // Always lenient: a search is worth running over a file that is not portable
+                // JSON, and reporting that it is not belongs to the inspector rather than here.
+                options: (scan ?? new JsonScanOptions()) with { Strictness = JsonScanStrictness.Lenient },
                 cancellationToken: cancellationToken);
         }
         catch (JsonScanException)
@@ -352,6 +355,7 @@ public static class JsonSearchEngine
         SearchQuery query,
         Action<SearchHit>? onHit = null,
         IProgress<double>? progress = null,
+        JsonScanOptions? scan = null,
         CancellationToken cancellationToken = default) =>
-        Task.Run(() => Search(source, query, onHit, progress, cancellationToken), cancellationToken);
+        Task.Run(() => Search(source, query, onHit, progress, scan, cancellationToken), cancellationToken);
 }

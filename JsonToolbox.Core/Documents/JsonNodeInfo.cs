@@ -89,6 +89,18 @@ public readonly record struct JsonNodeInfo(
         return null;
     }
 
+    /// <summary>
+    /// True for the stand-in root of a file that holds a sequence of documents rather than one.
+    /// </summary>
+    /// <remarks>
+    /// JSON Lines has no brackets around its records, so there is no node in the file to stand
+    /// for the whole of it. This one is invented to give the tree somewhere to start, and it
+    /// behaves like an array everywhere except where the brackets would matter — indexing its
+    /// children, which reads values a level shallower, and inserting into it, which has no
+    /// closing bracket to write before.
+    /// </remarks>
+    public bool IsSequenceRoot { get; init; }
+
     /// <summary>The byte offset doubles as a stable identity: no two values start at the same byte.</summary>
     public long Id => Start;
 

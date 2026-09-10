@@ -477,6 +477,12 @@
                   <!-- Said where the document is, not only in the status bar: it changes what
                        the rows below mean, and a status message is read once. -->
                   <Border Classes="chip" Margin="10,0,0,0" VerticalAlignment="Center"
+                          IsVisible="{Binding IsSequence}"
+                          ToolTip.Tip="This file holds one document per line rather than a single document. The records are shown as a list of them.">
+                    <TextBlock Text="sequence" />
+                  </Border>
+
+                  <Border Classes="chip" Margin="10,0,0,0" VerticalAlignment="Center"
                           IsVisible="{Binding IsReadLeniently}"
                           ToolTip.Tip="This file is not portable JSON. It is being read with comments and trailing commas allowed; run Inspect to see what is in it.">
                     <TextBlock Text="comments allowed" />

@@ -35,6 +35,16 @@ public sealed record JsonScanOptions
     /// <summary>Size of the rolling read buffer. Grown automatically for oversized tokens.</summary>
     public int BufferSize { get; init; } = 128 * 1024;
 
+    /// <summary>
+    /// Whether the document is a sequence of values rather than one.
+    /// </summary>
+    /// <remarks>
+    /// JSON Lines writes a record per line with nothing wrapping them, which is not a JSON
+    /// document at all — it is a file of them. Reading it as one stops at the first record and
+    /// says nothing about the rest, so a reader has to be told to expect more.
+    /// </remarks>
+    public bool AllowMultipleValues { get; init; }
+
     internal JsonReaderOptions ToReaderOptions() => new()
     {
         MaxDepth = MaxDepth,
@@ -42,6 +52,7 @@ public sealed record JsonScanOptions
             ? JsonCommentHandling.Skip
             : JsonCommentHandling.Disallow,
         AllowTrailingCommas = Strictness == JsonScanStrictness.Lenient,
+        AllowMultipleValues = AllowMultipleValues,
     };
 }
 

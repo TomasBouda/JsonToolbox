@@ -114,6 +114,13 @@ public sealed class JsonDocumentEditor(EditableJsonSource source)
             return EditResult.Refused("Only an object or an array can take a new member.");
         }
 
+        if (container.IsSequenceRoot)
+        {
+            // The stand-in root of a file of documents has no closing bracket to write before,
+            // and a record appended after the last line is a different operation than this one.
+            return EditResult.Refused("This file is a sequence of documents, not an array, so there is nothing to add a member to.");
+        }
+
         if (Validate(json) is { } problem)
         {
             return EditResult.Refused(problem);

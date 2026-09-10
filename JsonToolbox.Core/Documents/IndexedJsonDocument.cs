@@ -43,6 +43,27 @@ public sealed class IndexedJsonDocument : IDisposable
         ArgumentNullException.ThrowIfNull(source);
 
         (JsonKind kind, long start) = ProbeRoot(source);
+
+        // A file of documents gets a stand-in root that behaves like an array, because there is
+        // no node in the file to stand for the whole of it and the alternative — reading the
+        // first record and saying nothing about the rest — is the worst thing a reader can do.
+        if (JsonSequenceProbe.LooksLikeSequence(source, start))
+        {
+            var sequence = new JsonNodeInfo(
+                JsonKind.Array,
+                Name: null,
+                Index: 0,
+                Start: start,
+                End: source.Length,
+                ChildCount: -1,
+                Preview: null)
+            {
+                IsSequenceRoot = true,
+            };
+
+            return new IndexedJsonDocument(source, sequence);
+        }
+
         var root = new JsonNodeInfo(
             kind,
             Name: null,
@@ -54,6 +75,9 @@ public sealed class IndexedJsonDocument : IDisposable
 
         return new IndexedJsonDocument(source, root);
     }
+
+    /// <summary>True when the file holds a sequence of documents rather than one.</summary>
+    public bool IsSequence => Root.IsSequenceRoot;
 
     public static IndexedJsonDocument OpenFile(string path) => Open(JsonSource.FromFile(path));
 
@@ -81,19 +105,26 @@ public sealed class IndexedJsonDocument : IDisposable
         JsonScanOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        var indexer = new JsonChildIndexer(onChildFound, maxChildren, onChildCompleted, pinnedKeys);
+        var indexer = new JsonChildIndexer(onChildFound, maxChildren, onChildCompleted, pinnedKeys, node.IsSequenceRoot);
 
         if (!node.IsContainer)
         {
             return indexer;
         }
 
+        // Only the stand-in root is read as a sequence. A record inside it is an ordinary
+        // document once the scan starts at its own first byte, so nothing below the top level
+        // needs to know how the file is arranged.
+        JsonScanOptions effective = node.IsSequenceRoot
+            ? (options ?? new JsonScanOptions()) with { AllowMultipleValues = true }
+            : options ?? new JsonScanOptions();
+
         // A node whose end is not known yet is given the rest of the file; the indexer stops
         // itself at the node's closing bracket, so nothing beyond it is ever parsed.
         long available = node.HasKnownExtent ? node.ByteLength : _source.Length - node.Start;
 
         using Stream stream = _source.OpenRange(node.Start, available);
-        JsonScanner.Scan(stream, indexer, node.Start, options, cancellationToken);
+        JsonScanner.Scan(stream, indexer, node.Start, effective, cancellationToken);
         return indexer;
     }
 

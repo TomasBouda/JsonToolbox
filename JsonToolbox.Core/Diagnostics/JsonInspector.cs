@@ -695,10 +695,15 @@ public sealed class JsonInspector : JsonScanVisitor
 /// <summary>Runs an inspection over a whole document.</summary>
 public static class JsonInspection
 {
+    /// <param name="scan">
+    /// How to read the file, for the one thing inspection cannot work out for itself: whether it
+    /// holds a sequence of documents rather than one.
+    /// </param>
     public static InspectionReport Inspect(
         JsonSource source,
         InspectionOptions? options = null,
         IProgress<double>? progress = null,
+        JsonScanOptions? scan = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -709,7 +714,7 @@ public static class JsonInspection
         try
         {
             using Stream stream = source.OpenRead();
-            JsonScanner.Scan(stream, inspector, cancellationToken: cancellationToken);
+            JsonScanner.Scan(stream, inspector, options: scan, cancellationToken: cancellationToken);
             completed = true;
         }
         catch (JsonScanException ex)
@@ -734,6 +739,7 @@ public static class JsonInspection
         JsonSource source,
         InspectionOptions? options = null,
         IProgress<double>? progress = null,
+        JsonScanOptions? scan = null,
         CancellationToken cancellationToken = default) =>
-        Task.Run(() => Inspect(source, options, progress, cancellationToken), cancellationToken);
+        Task.Run(() => Inspect(source, options, progress, scan, cancellationToken), cancellationToken);
 }
