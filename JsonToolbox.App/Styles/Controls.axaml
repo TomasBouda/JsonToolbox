@@ -687,11 +687,29 @@
     <Setter Property="Padding" Value="0,6" />
   </Style>
 
-  <Style Selector="TextBlock.tableheadcell">
-    <Setter Property="Foreground" Value="{DynamicResource TextTertiary}" />
+  <!-- The heading is a button, because clicking it sorts. It is styled to look like a heading
+       rather than like a button: the thing it does is discovered by trying it, and a row of
+       buttons across the top of a table would read as a toolbar. -->
+  <Style Selector="Button.tableheadcell">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Margin" Value="10,0,0,0" />
     <Setter Property="FontSize" Value="11" />
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="Margin" Value="10,0,0,0" />
+    <Setter Property="Foreground" Value="{DynamicResource TextTertiary}" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+  </Style>
+
+  <Style Selector="Button.tableheadcell:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceHover}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource TextPrimary}" />
+  </Style>
+
+  <Style Selector="Button.tableheadcell.sorted">
+    <Setter Property="Foreground" Value="{DynamicResource AccentBase}" />
   </Style>
 
   <!-- The row number, which is the one thing a table of records cannot infer from its data. -->

@@ -754,6 +754,23 @@
                       <TextBlock Classes="path" Text="{Binding Table.Path}" />
                       <TextBlock Classes="caption" Text="{Binding Table.Summary}" />
                     </StackPanel>
+
+                    <!-- Narrows the records the table holds, which is a different question from
+                         the toolbar's search over the whole file. -->
+                    <Border Grid.Column="1" Width="200" VerticalAlignment="Center"
+                            Background="{DynamicResource SurfaceSunken}"
+                            CornerRadius="{StaticResource ControlRadius}"
+                            Padding="4">
+                      <Grid ColumnDefinitions="Auto,*">
+                        <PathIcon Grid.Column="0" Data="{StaticResource IconSearch}"
+                                  Width="11" Height="11" Margin="6,0,4,0"
+                                  Foreground="{DynamicResource TextTertiary}" />
+                        <TextBox Grid.Column="1" Classes="flat" FontSize="12"
+                                 Watermark="Filter these records…"
+                                 Text="{Binding Table.Filter}"
+                                 VerticalAlignment="Center" />
+                      </Grid>
+                    </Border>
                   </Grid>
                 </Border>
 
@@ -796,10 +813,19 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                               <DataTemplate x:DataType="vm:TableColumnViewModel">
-                                <TextBlock Classes="tableheadcell"
-                                           Width="{Binding Width}"
-                                           Text="{Binding Name}"
-                                           TextTrimming="CharacterEllipsis" />
+                                <!-- The heading is the control that sorts, because that is where
+                                     everyone reaches for it. Three states: up, down, and back to
+                                     the order the file writes. -->
+                                <Button Classes="tableheadcell"
+                                        Classes.sorted="{Binding IsSorted}"
+                                        Width="{Binding Width}"
+                                        Command="{Binding CycleSortCommand}"
+                                        ToolTip.Tip="Sort by this column; again to reverse it, again for the order of the file">
+                                  <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Marker}" />
+                                  </StackPanel>
+                                </Button>
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>

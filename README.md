@@ -149,6 +149,15 @@ So the columns are inferred from the first fifty records, and then every cell of
 out of one further pass over the array. A hundred-megabyte file of a million records becomes a
 table in under a second.
 
+Clicking a heading sorts by that column, again reverses it, and again puts the records back in
+the order the file writes them — which for a log is the only order that means anything, so a
+table that could not be put back would have taken something away. Numbers sort as numbers: a
+column of 1, 2, 10 read as text is 1, 10, 2, which is wrong in the way that makes somebody stop
+trusting a table. Records without the property go last whichever way the column points, because
+an absence is not a value that belongs at either end. And a filter narrows the records to those
+mentioning some text, in any column — a different question from the toolbar search, which reads
+the whole file rather than the records already in hand.
+
 The columns are the property names in the order the records first mention them, because JSON has
 nothing to declare them with. Only the first fifty are looked at: a serialiser that writes a
 field on record eight million and on none before it is describing an exception, not a column, and
