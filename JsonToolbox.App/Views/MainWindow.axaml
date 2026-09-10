@@ -698,6 +698,14 @@
                               IsVisible="{Binding CanEditValue}" />
                       <Button Classes="quiet" Content="Copy value" FontSize="11.5"
                               Command="{Binding CopyValueCommand}" />
+
+                      <!-- Only for a string that turned out to hold a document of its own.
+                           Reading one of those through its escapes is what this saves. -->
+                      <ToggleButton Classes="chip" Content="decoded"
+                                    IsChecked="{Binding ShowDecoded}"
+                                    IsVisible="{Binding HasEmbeddedJson}"
+                                    ToolTip.Tip="This string holds a JSON document. Show it as the document it is." />
+
                       <TextBlock Classes="caption" VerticalAlignment="Center"
                                  IsVisible="{Binding !CanEditValue}"
                                  Text="Too large to edit as text." />
@@ -720,6 +728,7 @@
                       <MultiBinding Converter="{x:Static BoolConverters.And}">
                         <Binding Path="HasSelection" />
                         <Binding Path="!CanEditValue" />
+                        <Binding Path="!ShowDecoded" />
                       </MultiBinding>
                     </ScrollViewer.IsVisible>
                     <ctl:HighlightTextBlock Margin="14"
@@ -736,8 +745,30 @@
                        allowed anywhere near the document. -->
                   <TextBox Classes="code"
                            Text="{Binding EditedValue}"
-                           IsVisible="{Binding CanEditValue}"
-                           AcceptsReturn="True" TextWrapping="NoWrap" />
+                           AcceptsReturn="True" TextWrapping="NoWrap">
+                    <TextBox.IsVisible>
+                      <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="CanEditValue" />
+                        <Binding Path="!ShowDecoded" />
+                      </MultiBinding>
+                    </TextBox.IsVisible>
+                  </TextBox>
+
+                  <!-- The document the string holds, read out. Not editable: what is written
+                       here would have to be escaped back into the string it came from, which is
+                       a different operation from changing a value and would have to say so. -->
+                  <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                VerticalScrollBarVisibility="Auto"
+                                IsVisible="{Binding ShowDecoded}">
+                    <ctl:HighlightTextBlock Margin="14"
+                                            Text="{Binding DecodedValue}"
+                                            Highlight="{Binding Highlight}"
+                                            MatchBackground="{DynamicResource MatchBackground}"
+                                            MatchForeground="{DynamicResource MatchForeground}"
+                                            FontFamily="{StaticResource MonoFont}"
+                                            FontSize="12.5"
+                                            TextWrapping="NoWrap" />
+                  </ScrollViewer>
                 </Panel>
               </DockPanel>
             </TabItem>

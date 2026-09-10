@@ -266,12 +266,12 @@ public sealed class JsonInspector : JsonScanVisitor
                 hint: "A consumer checking for null will not find one here.");
         }
 
-        if (LooksLikeEmbeddedJson(raw))
+        if (EmbeddedJson.MayBeEmbedded(raw) && EmbeddedJson.IsDocument(reader.GetString() ?? string.Empty))
         {
             Report(DiagnosticCodes.EmbeddedJsonString, DiagnosticSeverity.Info,
                 "String value contains a JSON document of its own.",
                 LastObservedPath, start,
-                hint: "Double-encoded JSON usually means a serializer ran twice. The toolbox can expand it inline.");
+                hint: "Double-encoded JSON usually means a serializer ran twice. Select the value to read it decoded.");
         }
 
         if (_options.DetectSecrets && name is not null && raw.Length >= 8 && IsSecretKey(name))
@@ -550,19 +550,6 @@ public sealed class JsonInspector : JsonScanVisitor
         raw.SequenceEqual("None"u8) ||
         raw.SequenceEqual("nil"u8) ||
         raw.SequenceEqual("N/A"u8));
-
-    private static bool LooksLikeEmbeddedJson(ReadOnlySpan<byte> raw)
-    {
-        if (raw.Length < 2)
-        {
-            return false;
-        }
-
-        // The bytes are still escaped here, so a quoted key reads as \" — which is exactly
-        // the signature of a JSON document that was serialized into a string.
-        return (raw[0] == (byte)'{' && raw[^1] == (byte)'}')
-            || (raw[0] == (byte)'[' && raw[^1] == (byte)']');
-    }
 
     private static int CountSignificantDigits(ReadOnlySpan<byte> raw)
     {

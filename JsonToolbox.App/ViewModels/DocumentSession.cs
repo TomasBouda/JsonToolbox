@@ -152,6 +152,25 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _canEditValue;
 
+    /// <summary>The selected string read back as the document it holds, when it holds one.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasEmbeddedJson))]
+    private string _decodedValue = string.Empty;
+
+    /// <summary>
+    /// Whether to show the decoded document instead of the string that carries it.
+    /// </summary>
+    /// <remarks>
+    /// A choice rather than a replacement, because both are the truth about the value and which
+    /// one somebody needs depends on why they are looking. It goes back off when the selection
+    /// moves: it is a way of reading this value, not a mode the pane is left in.
+    /// </remarks>
+    [ObservableProperty]
+    private bool _showDecoded;
+
+    /// <summary>True when the selected string turned out to hold a JSON document of its own.</summary>
+    public bool HasEmbeddedJson => DecodedValue.Length > 0;
+
     public DocumentSession(string path, SessionServices services)
     {
         _services = services;
@@ -830,6 +849,8 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         {
             HasSelection = false;
             CanEditValue = false;
+            DecodedValue = string.Empty;
+            ShowDecoded = false;
             SelectedPath = string.Empty;
             SelectedPointer = string.Empty;
             SelectedNodeDetail = string.Empty;
@@ -854,6 +875,14 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
 
         // A truncated rendering must not be writable: applying it would delete the rest.
         CanEditValue = node.HasKnownExtent && node.ByteLength <= EditableValueLimit;
+
+        // Double-encoded JSON is common enough in message payloads and connection settings that
+        // reading it by eye through the escapes is a real cost. Whether this string holds one is
+        // settled here, once, rather than each time the pane is drawn.
+        DecodedValue = node.Kind == JsonKind.String
+            ? EmbeddedJson.FromLiteral(SelectedNodeDetail) ?? string.Empty
+            : string.Empty;
+        ShowDecoded = false;
 
         _ = RefreshTableAsync();
 

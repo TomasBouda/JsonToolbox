@@ -27,7 +27,7 @@ The findings worth having are the ones a validator will not give you:
 | `JE0008` | `"null"`, `"undefined"` and friends written as text, where no null check will find them |
 | `JE0011` | A field present in 999 of 1 000 records — optional by accident, not by design |
 | `JE0012` | A property that looks like it holds a credential |
-| `JE0013` | Double-encoded JSON: a string whose content is itself a document |
+| `JE0013` | Double-encoded JSON: a string whose content is itself a document, confirmed by parsing it |
 
 Findings are folded by rule and shape, so a million records with the same defect produce one
 row with a count rather than a million rows.
@@ -125,6 +125,19 @@ share their pairing: the panes and the list of findings cannot be allowed to dis
 is in the comparison. A container is kept while the rows are built, because whether anything
 inside it matches is not known until it has been opened; once opened, one that holds nothing
 matching is a heading over nothing and goes.
+
+**A document inside a string is still a document.** Double-encoded JSON — an object serialised
+into a string and put inside another object — reads as `"payload": "{\"id\":42}"`, and through
+its escapes it is barely readable at all. Selecting such a value offers `decoded`, which shows
+the document it holds, indented and with its letters intact. A choice rather than a replacement:
+both are the truth about the value, and which one somebody needs depends on why they are looking.
+
+Whether a string holds one is decided in two steps, and the second is the one that matters. A
+document in a string still shows its brackets at each end while its quotes are escaped, so
+anything not bracketed is dismissed without being unescaped; what survives is then actually
+parsed. Skipping that parse is what made `"{DatabaseCNN}"` — a placeholder in a template — a
+finding eight times over in one configuration file, which is the kind of false report that
+teaches people to ignore reports.
 
 **A file of documents is not a document.** JSON Lines writes a record per line with nothing
 wrapping them. Read as a single document such a file yields its first record and nothing else —
@@ -322,7 +335,7 @@ defects.
 - JSONPath and JMESPath queries, beyond the current substring and regex search
 - Three-way merge, and exporting a diff as a patch
 - JSON Schema validation against a supplied schema
-- Decoding of embedded formats in place: base64, JWT, timestamps, URL encoding
+- Decoding other embedded formats in place: base64, JWT, timestamps, URL encoding
 - Redaction mode for sharing, and type generation for C# and TypeScript
 - Keeping the undo history across a save. Saving in place means releasing the mapping the
   document is read through and opening the new file, which the recorded snapshots cannot
