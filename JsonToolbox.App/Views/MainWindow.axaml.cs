@@ -14,7 +14,8 @@ public partial class MainWindow : Window
 
         WindowChrome.FollowTheme(this);
         TreeRowAnchor.Install();
-        TreeScrollMemory.Install();
+        ScrollMemory.Install();
+        TextRowReveal.Install();
         TabDragging.Attach(this.FindControl<ItemsControl>("DocumentTabs")!);
 
         AddHandler(DragDrop.DropEvent, OnDrop);

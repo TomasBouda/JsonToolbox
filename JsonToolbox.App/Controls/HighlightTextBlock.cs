@@ -14,7 +14,12 @@ namespace JsonToolbox.App.Controls;
 /// <para>
 /// Finding a hit and then having to hunt for it inside a long value is most of the work a
 /// search was supposed to save, so the term is marked up wherever the text is shown: in the
-/// tree, in the result list, and in the value pane.
+/// tree, in the result list, in the value pane, and in the text of the file.
+/// </para>
+/// <para>
+/// Text that is a slice of the document can also mark a byte range — the value selected in
+/// the tree — given where in the document it begins. The two markings are drawn together,
+/// with a match showing through the mark, so a hit inside the selected value is still a hit.
 /// </para>
 /// <para>
 /// The control listens to the shared <see cref="SearchHighlight"/> only while it is attached
@@ -46,7 +51,21 @@ public class HighlightTextBlock : TextBlock
     public static readonly StyledProperty<IBrush?> MatchForegroundProperty =
         AvaloniaProperty.Register<HighlightTextBlock, IBrush?>(nameof(MatchForeground));
 
+    /// <summary>
+    /// A byte range to mark as the selected value, for text that is a slice of the document.
+    /// </summary>
+    public static readonly StyledProperty<TextMark?> MarkProperty =
+        AvaloniaProperty.Register<HighlightTextBlock, TextMark?>(nameof(Mark));
+
+    /// <summary>Where in the document this text begins, so the mark can be placed in it.</summary>
+    public static readonly StyledProperty<long> ByteOffsetProperty =
+        AvaloniaProperty.Register<HighlightTextBlock, long>(nameof(ByteOffset), -1);
+
+    public static readonly StyledProperty<IBrush?> MarkBackgroundProperty =
+        AvaloniaProperty.Register<HighlightTextBlock, IBrush?>(nameof(MarkBackground));
+
     private SearchHighlight? _subscribed;
+    private TextMark? _subscribedMark;
 
     static HighlightTextBlock()
     {
@@ -54,6 +73,9 @@ public class HighlightTextBlock : TextBlock
         HighlightProperty.Changed.AddClassHandler<HighlightTextBlock>((c, e) => c.OnHighlightChanged(e));
         MatchBackgroundProperty.Changed.AddClassHandler<HighlightTextBlock>((c, _) => c.Rebuild());
         MatchForegroundProperty.Changed.AddClassHandler<HighlightTextBlock>((c, _) => c.Rebuild());
+        MarkProperty.Changed.AddClassHandler<HighlightTextBlock>((c, e) => c.OnMarkChanged(e));
+        ByteOffsetProperty.Changed.AddClassHandler<HighlightTextBlock>((c, _) => c.Rebuild());
+        MarkBackgroundProperty.Changed.AddClassHandler<HighlightTextBlock>((c, _) => c.Rebuild());
     }
 
     /// <summary>The shared search term. Set once from the view model that owns the search.</summary>
@@ -75,16 +97,36 @@ public class HighlightTextBlock : TextBlock
         set => SetValue(MatchForegroundProperty, value);
     }
 
+    public TextMark? Mark
+    {
+        get => GetValue(MarkProperty);
+        set => SetValue(MarkProperty, value);
+    }
+
+    public long ByteOffset
+    {
+        get => GetValue(ByteOffsetProperty);
+        set => SetValue(ByteOffsetProperty, value);
+    }
+
+    public IBrush? MarkBackground
+    {
+        get => GetValue(MarkBackgroundProperty);
+        set => SetValue(MarkBackgroundProperty, value);
+    }
+
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
         Subscribe(Highlight);
+        SubscribeMark(Mark);
         Rebuild();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         Subscribe(null);
+        SubscribeMark(null);
         base.OnDetachedFromVisualTree(e);
     }
 
@@ -92,6 +134,32 @@ public class HighlightTextBlock : TextBlock
     {
         Subscribe(e.NewValue as SearchHighlight);
         Rebuild();
+    }
+
+    private void OnMarkChanged(AvaloniaPropertyChangedEventArgs e)
+    {
+        SubscribeMark(e.NewValue as TextMark);
+        Rebuild();
+    }
+
+    private void SubscribeMark(TextMark? mark)
+    {
+        if (ReferenceEquals(_subscribedMark, mark))
+        {
+            return;
+        }
+
+        if (_subscribedMark is not null)
+        {
+            _subscribedMark.PropertyChanged -= OnHighlightPropertyChanged;
+        }
+
+        _subscribedMark = mark;
+
+        if (_subscribedMark is not null)
+        {
+            _subscribedMark.PropertyChanged += OnHighlightPropertyChanged;
+        }
     }
 
     private void Subscribe(SearchHighlight? highlight)
@@ -123,8 +191,9 @@ public class HighlightTextBlock : TextBlock
         IReadOnlyList<Range> matches = text.Length <= MaxHighlightedLength
             ? Highlight?.Find(text) ?? []
             : [];
+        (int markStart, int markEnd) = MarkedChars(text);
 
-        if (matches.Count == 0)
+        if (matches.Count == 0 && markStart >= markEnd)
         {
             // Clearing the inlines lets the base class render the plain string, which is both
             // faster and correctly selectable.
@@ -132,33 +201,114 @@ public class HighlightTextBlock : TextBlock
             return;
         }
 
-        var inlines = new InlineCollection();
-        int cursor = 0;
+        // Every place the styling can change, in order: the mark's ends and each match's ends.
+        // Walking them gives runs that are each uniformly styled, however the two overlap.
+        var edges = new SortedSet<int> { 0, text.Length };
+        if (markStart < markEnd)
+        {
+            edges.Add(markStart);
+            edges.Add(markEnd);
+        }
 
         foreach (Range match in matches)
         {
             (int start, int length) = match.GetOffsetAndLength(text.Length);
-
-            if (start > cursor)
-            {
-                inlines.Add(new Run(text[cursor..start]));
-            }
-
-            inlines.Add(new Run(text.Substring(start, length))
-            {
-                Background = MatchBackground,
-                Foreground = MatchForeground ?? Foreground,
-                FontWeight = FontWeight.SemiBold,
-            });
-
-            cursor = start + length;
+            edges.Add(start);
+            edges.Add(start + length);
         }
 
-        if (cursor < text.Length)
+        var inlines = new InlineCollection();
+        int cursor = 0;
+        int nextMatch = 0;
+
+        foreach (int edge in edges)
         {
-            inlines.Add(new Run(text[cursor..]));
+            if (edge <= cursor)
+            {
+                continue;
+            }
+
+            while (nextMatch < matches.Count && matches[nextMatch].End.GetOffset(text.Length) <= cursor)
+            {
+                nextMatch++;
+            }
+
+            bool inMatch = nextMatch < matches.Count && matches[nextMatch].Start.GetOffset(text.Length) <= cursor;
+            bool inMark = cursor >= markStart && cursor < markEnd;
+            var run = new Run(text[cursor..edge]);
+
+            if (inMatch)
+            {
+                run.Background = MatchBackground;
+                run.Foreground = MatchForeground ?? Foreground;
+                run.FontWeight = FontWeight.SemiBold;
+            }
+            else if (inMark)
+            {
+                run.Background = MarkBackground;
+            }
+
+            inlines.Add(run);
+            cursor = edge;
         }
 
         Inlines = inlines;
+    }
+
+    /// <summary>
+    /// The characters of the text that the mark covers, found by walking the text's UTF-8
+    /// length up to each end of the byte range.
+    /// </summary>
+    private (int Start, int End) MarkedChars(string text)
+    {
+        if (Mark is not { IsSet: true } mark || ByteOffset < 0 || text.Length == 0)
+        {
+            return (0, 0);
+        }
+
+        long start = mark.Start - ByteOffset;
+        long end = mark.End - ByteOffset;
+
+        if (end <= 0)
+        {
+            return (0, 0);
+        }
+
+        int charStart = -1;
+        int charEnd = text.Length;
+        long bytes = 0;
+
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (charStart < 0 && bytes >= start)
+            {
+                charStart = i;
+            }
+
+            if (bytes >= end)
+            {
+                charEnd = i;
+                break;
+            }
+
+            char c = text[i];
+            if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+            {
+                bytes += 4;
+                i++;
+            }
+            else
+            {
+                bytes += c < 0x80 ? 1 : c < 0x800 ? 2 : 3;
+            }
+        }
+
+        if (charStart < 0)
+        {
+            // The range starts past this text, or exactly at its end, so none of it is marked.
+            return (0, 0);
+        }
+
+        return (charStart, charEnd);
     }
 }

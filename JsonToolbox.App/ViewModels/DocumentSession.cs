@@ -74,16 +74,16 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
     private JsonNodeViewModel? _selectedNode;
 
     /// <summary>
-    /// Where the tree was scrolled to when this document was last on screen, in the view's own
-    /// units.
+    /// Where each list was scrolled to when this document was last on screen, by the name
+    /// the list keeps it under, in the view's own units.
     /// </summary>
     /// <remarks>
-    /// The tree control is shared by every tab and is handed a different list of rows on each
-    /// switch, which puts it back at the top. Which nodes are open already survives a switch
-    /// because it lives here; this is the rest of the reader's place, kept alongside so that
-    /// coming back to a tab means coming back to the same rows.
+    /// The tree and text controls are shared by every tab and are handed a different list of
+    /// rows on each switch, which puts them back at the top. Which nodes are open already
+    /// survives a switch because it lives here; this is the rest of the reader's place, kept
+    /// alongside so that coming back to a tab means coming back to the same rows.
     /// </remarks>
-    public Vector TreeScroll { get; set; }
+    public Dictionary<string, Vector> ScrollPositions { get; } = [];
 
     [ObservableProperty]
     private string _selectedNodeDetail = string.Empty;
@@ -576,10 +576,67 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
 
     public bool HasTable => Table is not null;
 
-    /// <summary>The index of the table panel among the tabs beside the tree.</summary>
-    private const int TablePanelIndex = 1;
+    /// <summary>The index of the text panel among the tabs beside the tree.</summary>
+    private const int TextPanelIndex = 1;
 
-    partial void OnSelectedPanelChanged(int value) => _ = RefreshTableAsync();
+    /// <summary>The index of the table panel among the tabs beside the tree.</summary>
+    private const int TablePanelIndex = 2;
+
+    partial void OnSelectedPanelChanged(int value)
+    {
+        _ = RefreshTableAsync();
+        _ = RefreshRawTextAsync();
+    }
+
+    // ---- The text --------------------------------------------------------------------
+
+    /// <summary>
+    /// The document as text, once it has been looked at. Null until the text panel is first
+    /// shown, because counting the rows of a large file is a pass over all of it.
+    /// </summary>
+    [ObservableProperty]
+    private RawTextViewModel? _rawText;
+
+    /// <summary>
+    /// Builds the text view for the document as it now stands, when the text is on screen.
+    /// </summary>
+    private async Task RefreshRawTextAsync()
+    {
+        if (SelectedPanel != TextPanelIndex || RawText is not null)
+        {
+            return;
+        }
+
+        var text = new RawTextViewModel(_document, Highlight, offset => _ = RevealAsync(offset));
+        RawText = text;
+
+        if (SelectedNode is { IsMoreRow: false } selected)
+        {
+            text.Show(MarkStart(selected.Node), MarkEnd(selected.Node));
+        }
+
+        await text.BuildAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Forgets the text after the document changed under it, so it is counted again — at
+    /// once if it is being looked at, otherwise when it next is.
+    /// </summary>
+    private void DropRawText()
+    {
+        RawText?.Dispose();
+        RawText = null;
+        _ = RefreshRawTextAsync();
+    }
+
+    /// <summary>The first byte the text marks for a value: its name, when it has one.</summary>
+    private static long MarkStart(JsonNodeInfo node) => node.HasNamePosition ? node.NameStart : node.Start;
+
+    /// <summary>
+    /// The byte after the last one the text marks for a value. A value still being read has
+    /// no known end, so only its first byte is marked.
+    /// </summary>
+    private static long MarkEnd(JsonNodeInfo node) => node.HasKnownExtent ? node.End : node.Start + 1;
 
     /// <summary>
     /// Builds the table for whatever array the selection is in.
@@ -805,6 +862,7 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
     private async Task RebuildAfterEditAsync()
     {
         _document = IndexedJsonDocument.Open(_editor.Source);
+        DropRawText();
         await RebuildTreeAsync().ConfigureAwait(true);
     }
 
@@ -813,6 +871,7 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         var editable = new EditableJsonSource(JsonSource.FromFile(path));
         _editor = new JsonDocumentEditor(editable);
         _document = IndexedJsonDocument.Open(editable);
+        DropRawText();
         await RebuildTreeAsync().ConfigureAwait(true);
     }
 
@@ -867,6 +926,7 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
             SelectedPath = string.Empty;
             SelectedPointer = string.Empty;
             SelectedNodeDetail = string.Empty;
+            RawText?.ClearSelection();
             return;
         }
 
@@ -900,6 +960,7 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
         _ = RefreshTableAsync();
 
         _ = UpdateLineNumberAsync(node.Start);
+        RawText?.Show(MarkStart(node), MarkEnd(node));
     }
 
     /// <summary>
@@ -979,6 +1040,7 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
     public void Dispose()
     {
         _searchCancellation?.Dispose();
+        RawText?.Dispose();
         _editor.Source.Dispose();
     }
 }

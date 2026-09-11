@@ -522,7 +522,7 @@
               panel knows exactly how long the list is instead of estimating from an average
               that one expanded branch would throw off. Nesting is drawn from each row's depth.
             -->
-            <ListBox Name="TreeRows" ctl:TreeScrollMemory.Keep="True"
+            <ListBox Name="TreeRows" ctl:ScrollMemory.Keep="tree"
                      ItemsSource="{Binding Tree.Rows}"
                      SelectedItem="{Binding SelectedNode}"
                      Classes="rows">
@@ -773,6 +773,55 @@
                                             TextWrapping="NoWrap" />
                   </ScrollViewer>
                 </Panel>
+              </DockPanel>
+            </TabItem>
+
+            <!-- ................................................................ Text -->
+            <!-- The file as it is written, beside the tree that reads it. The rows are a
+                 virtual list over an index counted in the background, so a gigabyte is shown
+                 without being loaded; the selected value is marked and clicking a row selects
+                 what is under the pointer in the tree. -->
+            <TabItem Header="Text">
+              <DockPanel>
+
+                <Border DockPanel.Dock="Top" Padding="14,8"
+                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1"
+                        IsVisible="{Binding RawText.IsBuilding, FallbackValue=False}">
+                  <TextBlock Classes="caption" Text="{Binding RawText.Status}" />
+                </Border>
+
+                <ListBox Name="TextRows" Classes="rows text"
+                         ctl:ScrollMemory.Keep="text"
+                         ItemsSource="{Binding RawText.Rows}"
+                         SelectedItem="{Binding RawText.SelectedRow, Mode=OneWay}"
+                         AutoScrollToSelectedItem="False"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                  <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                  </ListBox.ItemsPanel>
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TextRowViewModel">
+                      <Grid ColumnDefinitions="Auto,*" Background="Transparent">
+                        <TextBlock Grid.Column="0" Classes="lineNumber"
+                                   Text="{Binding LineLabel}" />
+                        <ctl:HighlightTextBlock Grid.Column="1"
+                                                Text="{Binding Text}"
+                                                ByteOffset="{Binding Start}"
+                                                Highlight="{Binding Owner.Highlight}"
+                                                Mark="{Binding Owner.Mark}"
+                                                MatchBackground="{DynamicResource MatchBackground}"
+                                                MatchForeground="{DynamicResource MatchForeground}"
+                                                MarkBackground="{DynamicResource AccentSoft}"
+                                                FontFamily="{StaticResource MonoFont}"
+                                                FontSize="12.5"
+                                                TextWrapping="NoWrap"
+                                                VerticalAlignment="Center" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
               </DockPanel>
             </TabItem>
 

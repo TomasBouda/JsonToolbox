@@ -153,6 +153,27 @@ on a single line is not JSON Lines whatever the extension says. Nothing below th
 to know any of this — a record is an ordinary document once the scan starts at its own first
 byte — and a log of a million lines becomes a table like any other array.
 
+**Show the file as it is written, beside the tree that reads it.** The `Text` panel is the raw
+text, and it is the same file the tree is over rather than a copy: the rows are a virtual list
+that reads each one from the mapping when it is scrolled into view, so a gigabyte is shown
+without being loaded. What a file read through a mapping does not have is rows, and counting
+them is a pass over the bytes; the pass keeps only every 64th row's offset, because a
+gigabyte of pretty-printed JSON has tens of millions of lines and an offset for each would be
+more memory than the file deserves. Any other row is found by reading forward from the
+checkpoint before it — a bounded amount of work, using the same splitting the count used, so
+the two can never disagree about where a row starts. A minified document is one line of the
+whole file, which no text control can lay out, so a line longer than 2 KB is shown as several
+rows that continue it, and the numbers in the margin still count lines. The count runs in the
+background and the list grows as it goes, so the top of a large file is readable before the
+bottom has been reached.
+
+The tree and the text point at the same value. Selecting in the tree marks the value's bytes
+in the text — its name included — and scrolls to them, placed a third of the way down so what
+they contain is what you see; clicking in the text selects the value under the pointer in the
+tree, and a click in the margin or past the end of a line means the first thing on it. The
+search term is marked up here too, as it is everywhere else the document's text is shown, so
+a hit found in the results list is found again in the file the moment it is selected.
+
 **Read a column at a time, not a record at a time.** A tree is how you find your way around a
 document; it is not how anyone reads an array of a million records. The `Table` panel draws one
 as a grid, and what makes it affordable is a scan that already existed. Listing a container's
@@ -334,8 +355,6 @@ without publishing anything, which is how to check a change to the workflow itse
 The foundation is complete and covered by tests; these are the next features rather than known
 defects.
 
-- Synchronized raw text view alongside the tree, with the search term marked up in it too
-  (it is already marked up in the tree, the results list and the value pane)
 - JSONPath and JMESPath queries, beyond the current substring and regex search
 - Three-way merge, and exporting a diff as a patch
 - JSON Schema validation against a supplied schema
