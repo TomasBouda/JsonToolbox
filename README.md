@@ -214,7 +214,11 @@ just that one.
 findings, its pending edits — lives in that document's own session, so opening a second file
 opens a second session rather than swapping the contents of one. Switching tabs changes which
 session is on screen and nothing else: neither loses its place, its search results, or its
-unsaved work, and a modified tab carries the same mark the window title does.
+unsaved work, and a modified tab carries the same mark the window title does. The place kept
+includes the scroll position: the one tree control serves every tab, so where each document
+was scrolled to is copied out when its tab is left and back in when it is shown again. Tabs
+drag into whatever order suits, close with the middle button or Ctrl+W, and the one closed by
+mistake comes back where it was with Ctrl+Shift+T.
 
 **Edit without rewriting the file.** The whole design rests on values being byte offsets into a
 file that is never copied, and editing breaks that: change one character near the front and
@@ -345,6 +349,3 @@ defects.
   than attempted. Doing it properly means streaming the rewrite to a temporary file and handing
   the piece table a slice of that, instead of building the bytes up front.
 - Editing values too large to show as text, and reordering members
-- Keeping each tab's scroll position. Which nodes are open survives a switch because it lives
-  in the session, but the view is rebuilt when a tab is shown, so it returns to the top.
-- Reordering tabs, and reopening a document that was closed by mistake

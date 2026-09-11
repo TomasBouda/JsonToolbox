@@ -42,8 +42,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasComparison;
 
-    /// <summary>Every file that is open, in the order it was opened.</summary>
+    /// <summary>Every file that is open, in the order the tabs show them.</summary>
     public ObservableCollection<DocumentSession> Documents { get; } = [];
+
+    /// <summary>
+    /// The files closed in this window, most recent last, with where their tab was.
+    /// </summary>
+    /// <remarks>
+    /// Closing the wrong tab is a slip that should cost one key press, not a trip through the
+    /// file picker, so what was closed is remembered until it is opened again. Only the path is
+    /// kept: the session itself is disposed on closing, because it holds the file open.
+    /// </remarks>
+    private readonly List<(string Path, int Index)> _closed = [];
 
     /// <summary>
     /// The comparison. It exists from the start, empty, rather than being created when it is
@@ -206,7 +216,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    public void OpenPath(string path)
+    public void OpenPath(string path) => OpenPath(path, Documents.Count);
+
+    /// <summary>
+    /// Opens a file with its tab at the given position, which is how a closed one returns to
+    /// where it was.
+    /// </summary>
+    private void OpenPath(string path, int index)
     {
         // A file that is already open is shown rather than opened twice.
         if (Documents.FirstOrDefault(d => PathsMatch(d, path)) is { } existing)
@@ -235,7 +251,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
         };
 
-        Documents.Add(session);
+        Documents.Insert(Math.Clamp(index, 0, Documents.Count), session);
         Comparison.SyncChoices(Documents);
         ActiveDocument = session;
         IsDiffOpen = false;
@@ -254,11 +270,60 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Comparison.SyncChoices(Documents);
         session.Dispose();
 
+        if (session.Document.Source.FilePath is { } path)
+        {
+            _closed.Add((path, index));
+        }
+
         ActiveDocument = Documents.Count == 0
             ? null
             : Documents[Math.Min(index, Documents.Count - 1)];
 
         StatusText = Documents.Count == 0 ? "Open a JSON file to begin." : $"Closed {session.Name}.";
+    }
+
+    /// <summary>Closes whatever tab is on screen, the comparison included.</summary>
+    [RelayCommand]
+    private void CloseView()
+    {
+        if (IsDiffOpen)
+        {
+            CloseComparison();
+        }
+        else
+        {
+            CloseDocument(ActiveDocument);
+        }
+    }
+
+    /// <summary>Opens the document that was closed most recently, in the tab it had.</summary>
+    [RelayCommand]
+    private void ReopenClosed()
+    {
+        if (_closed.Count == 0)
+        {
+            StatusText = "Nothing has been closed.";
+            return;
+        }
+
+        (string path, int index) = _closed[^1];
+        _closed.RemoveAt(_closed.Count - 1);
+        OpenPath(path, index);
+    }
+
+    /// <summary>
+    /// Puts a document's tab at the given position, which is what dragging it does.
+    /// </summary>
+    public void MoveDocument(DocumentSession session, int index)
+    {
+        int from = Documents.IndexOf(session);
+        index = Math.Clamp(index, 0, Documents.Count - 1);
+
+        if (from >= 0 && from != index)
+        {
+            Documents.Move(from, index);
+            Comparison.SyncChoices(Documents);
+        }
     }
 
     [RelayCommand]

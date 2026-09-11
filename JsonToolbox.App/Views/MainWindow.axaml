@@ -17,6 +17,8 @@
     <KeyBinding Gesture="Ctrl+Y" Command="{Binding ActiveDocument.RedoCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding ActiveDocument.RedoCommand}" />
     <KeyBinding Gesture="Ctrl+Tab" Command="{Binding SwitchViewCommand}" />
+    <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseViewCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+T" Command="{Binding ReopenClosedCommand}" />
   </Window.KeyBindings>
 
   <Window.Resources>
@@ -174,7 +176,7 @@
 
           <!-- One tab per open file. The mark on a modified tab is the same one the window
                title carries, so the two never disagree about which file has unsaved work. -->
-          <ItemsControl ItemsSource="{Binding Documents}">
+          <ItemsControl Name="DocumentTabs" ItemsSource="{Binding Documents}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <StackPanel Orientation="Horizontal" Spacing="2" />
@@ -185,6 +187,7 @@
                 <Button Classes="tab" Classes.active="{Binding IsActive}"
                         Command="{Binding ActivateCommand}"
                         ToolTip.Tip="{Binding Name}">
+                  <!-- Dragged to reorder, middle-clicked to close: see TabDragging. -->
                   <StackPanel Orientation="Horizontal" Spacing="7">
                     <PathIcon Data="{StaticResource IconDocument}" Width="11" Height="11" />
                     <TextBlock Text="{Binding TabTitle}" />
@@ -519,7 +522,7 @@
               panel knows exactly how long the list is instead of estimating from an average
               that one expanded branch would throw off. Nesting is drawn from each row's depth.
             -->
-            <ListBox Name="TreeRows"
+            <ListBox Name="TreeRows" ctl:TreeScrollMemory.Keep="True"
                      ItemsSource="{Binding Tree.Rows}"
                      SelectedItem="{Binding SelectedNode}"
                      Classes="rows">

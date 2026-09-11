@@ -213,20 +213,24 @@ public sealed partial class ComparisonViewModel : ObservableObject
             }
         }
 
-        // New documents go after the ones already listed and before any picked files, so the
-        // list reads in the order the tabs do.
-        int insertAt = 0;
+        // The documents come first and in the order the tabs do, with any picked files after
+        // them. A document already listed is moved rather than replaced, so a side that points
+        // at it keeps pointing at it when the tabs are rearranged.
+        int at = 0;
         foreach (DocumentSession session in open)
         {
-            if (Choices.FirstOrDefault(c => c.Session == session) is { } existing)
+            int existing = Choices.ToList().FindIndex(c => c.Session == session);
+
+            if (existing < 0)
             {
-                insertAt = Choices.IndexOf(existing) + 1;
+                Choices.Insert(at, ComparisonChoice.ForSession(session));
             }
-            else
+            else if (existing != at)
             {
-                Choices.Insert(insertAt, ComparisonChoice.ForSession(session));
-                insertAt++;
+                Choices.Move(existing, at);
             }
+
+            at++;
         }
 
         // A side that pointed at a document which has since been closed is cleared rather than

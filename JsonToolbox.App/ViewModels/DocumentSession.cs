@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JsonToolbox.Core.Diagnostics;
@@ -71,6 +72,18 @@ public sealed partial class DocumentSession : ObservableObject, IDisposable
 
     [ObservableProperty]
     private JsonNodeViewModel? _selectedNode;
+
+    /// <summary>
+    /// Where the tree was scrolled to when this document was last on screen, in the view's own
+    /// units.
+    /// </summary>
+    /// <remarks>
+    /// The tree control is shared by every tab and is handed a different list of rows on each
+    /// switch, which puts it back at the top. Which nodes are open already survives a switch
+    /// because it lives here; this is the rest of the reader's place, kept alongside so that
+    /// coming back to a tab means coming back to the same rows.
+    /// </remarks>
+    public Vector TreeScroll { get; set; }
 
     [ObservableProperty]
     private string _selectedNodeDetail = string.Empty;
