@@ -1,0 +1,283 @@
+# Design notes
+
+Why JSON Toolbox is built the way it is. The [README](../README.md) says what it does; this
+is the reasoning behind the decisions that shape the code, kept for whoever changes them next.
+
+## Layout
+
+```
+JsonToolbox.Core          parsing, indexing, search, inspection — no UI dependency
+JsonToolbox.App           Avalonia desktop application
+  Styles/Tokens.axaml     every colour, once per theme
+  Styles/Controls.axaml   appearance only, on top of Fluent
+  Assets/icon.ico         the application icon, drawn by the script below
+JsonToolbox.Core.Tests
+JsonToolbox.App.Tests     the command line, and whatever else is logic rather than layout
+tools/generate-icon.ps1   redraws the icon at every size it needs
+```
+
+The decisions that shape everything else, in the order they were made.
+
+**One scanner, many visitors.** `JsonScanner` reads a document in a single forward pass over
+a rolling buffer and hands each token to a `JsonScanVisitor`. Indexing, searching and
+inspecting are all visitors over that one scan, so no feature needs its own parser and none of
+them need the document to fit in RAM.
+
+**Index one level at a time.** Opening a file looks at its first non-whitespace byte and stops
+there. A node's children are read the first time somebody expands it, from a memory-mapped
+slice covering exactly that node. Opening a gigabyte costs about three milliseconds.
+
+**Announce containers when they open.** A child is reported at its opening bracket, before its
+size is known, and updated when its closing bracket is reached. Without this, the last child
+of a large document would only appear once the whole file had been read — which is precisely
+the wait the design exists to avoid.
+
+**Index in full, show a page.** Reading fifty thousand children of a large array costs a few
+hundred milliseconds on a worker thread; turning them into fifty thousand rows costs seconds
+of frozen window, and nobody scrolls through fifty thousand rows. So the index is kept as
+plain structs and the rows are materialised five hundred at a time, in one batched change
+rather than one change per row.
+
+**Show the tree as a flat list.** A nested tree control has to guess how tall the branches it
+has not built are, and it guesses by averaging the rows it has built. Expanding one node
+breaks that average — a row twelve times taller than its neighbours drags it up by a third —
+and the control then believes it is scrolled somewhere else entirely: opening item 264 of a
+long array left you looking at item 182. Flattening removes the guess. Every row is one line
+tall, the list knows exactly how many there are, expanding inserts rows into the middle
+without changing anything above them, and indentation is drawn from each row's depth.
+
+**Diff by structure, shown side by side.** Comparing two documents as text reports reformatting
+and reordered keys as changes, and misses that a record moved. `Compare` matches objects by
+key, and array elements by their identifier where the records carry one — so an edited record
+reads as "this field changed", not as one record leaving and another arriving. What makes it
+affordable is that identical bytes mean an identical subtree: an unchanged branch is dismissed
+without being parsed, and a changed one fails that comparison within a few bytes. One changed
+value in a pair of 300 MB files is found in 1.2 seconds.
+
+A comparison opens as a tab beside the open documents rather than as a mode to be entered and
+left, so switching is a click on the thing you want (or Ctrl+Tab) instead of dismissing the
+thing you do not.
+
+Both sides are chosen in that tab rather than assumed. `Compare` used to mean "this document
+against a file you are about to pick", which is one of the several things a person might want;
+now each side is a picker offering the documents that are already open — with their unsaved
+edits, so what is compared is what is on screen — and a button for any other file on disk.
+Either side can be changed afterwards without starting again, and the comparison re-runs as
+soon as both are set. Closing a document a side points at clears that side and the result with
+it, rather than leaving a comparison of something that is no longer there.
+
+The result is shown as two panes, and they are one list: each row is a pair, drawing its left
+and right halves in two columns. Alignment is therefore not something to maintain and there is
+no scrolling to keep in step. Rows are tinted by what happened to them, "changes only" hides
+what the two documents agree on, and the pairing that draws the panes is the same code that
+produces the list of findings — so the two views cannot disagree.
+
+Inside a changed value the edit itself is marked: green on the right for what arrived, red on
+the left for what went. Two values side by side answer "did this change"; they do not answer
+"what changed", and for `"Sahakar Nagar"` against `"Sahakar Nagars"` that is one letter nobody
+should have to hunt for.
+
+**One search box, for whatever is on screen.** A comparison of two large documents answers "what
+changed" with hundreds of rows, and the question that follows is always narrower — what changed
+about the price, about this record, about anything called `id`. So the toolbar's search narrows
+the comparison when the comparison is what you are looking at, and searches the file when a
+document is. The two are arrived at differently — one reads the whole file, the other filters
+differences already found and needs no Find button, so the modifiers and the button step aside —
+but that is a difference in how the answer is reached, not in what is being asked, and it does
+not justify a second field somewhere else on the screen. Each view keeps its own text, so
+switching tabs brings back what was being looked for there.
+
+Narrowing the comparison drives both of its views from the one text, for the same reason they
+share their pairing: the panes and the list of findings cannot be allowed to disagree about what
+is in the comparison. A container is kept while the rows are built, because whether anything
+inside it matches is not known until it has been opened; once opened, one that holds nothing
+matching is a heading over nothing and goes.
+
+**A document inside a string is still a document.** Double-encoded JSON — an object serialised
+into a string and put inside another object — reads as `"payload": "{\"id\":42}"`, and through
+its escapes it is barely readable at all. Selecting such a value offers `decoded`, which shows
+the document it holds, indented and with its letters intact. A choice rather than a replacement:
+both are the truth about the value, and which one somebody needs depends on why they are looking.
+
+Whether a string holds one is decided in two steps, and the second is the one that matters. A
+document in a string still shows its brackets at each end while its quotes are escaped, so
+anything not bracketed is dismissed without being unescaped; what survives is then actually
+parsed. Skipping that parse is what made `"{DatabaseCNN}"` — a placeholder in a template — a
+finding eight times over in one configuration file, which is the kind of false report that
+teaches people to ignore reports.
+
+**A file of documents is not a document.** JSON Lines writes a record per line with nothing
+wrapping them. Read as a single document such a file yields its first record and nothing else —
+no error, no mention of the rest — which for a tool whose whole claim is that you can trust what
+it shows is worse than refusing to open it. So a file that holds a sequence gets a stand-in root
+that behaves like an array of its records, and says so on a chip in the panel header.
+
+Telling the two apart cannot mean reading the file, because the question is asked when a document
+is opened and opening is meant to cost milliseconds whatever the size. Only the head is read: if
+a complete value ends inside it and something follows, the file is a sequence; if the first value
+has not finished by the end of the head, it is one large document, because a gigabyte-long record
+on a single line is not JSON Lines whatever the extension says. Nothing below the top level needs
+to know any of this — a record is an ordinary document once the scan starts at its own first
+byte — and a log of a million lines becomes a table like any other array.
+
+**Show the file as it is written, beside the tree that reads it.** The `Text` panel is the raw
+text, and it is the same file the tree is over rather than a copy: the rows are a virtual list
+that reads each one from the mapping when it is scrolled into view, so a gigabyte is shown
+without being loaded. What a file read through a mapping does not have is rows, and counting
+them is a pass over the bytes; the pass keeps only every 64th row's offset, because a
+gigabyte of pretty-printed JSON has tens of millions of lines and an offset for each would be
+more memory than the file deserves. Any other row is found by reading forward from the
+checkpoint before it — a bounded amount of work, using the same splitting the count used, so
+the two can never disagree about where a row starts. A minified document is one line of the
+whole file, which no text control can lay out, so a line longer than 2 KB is shown as several
+rows that continue it, and the numbers in the margin still count lines. The count runs in the
+background and the list grows as it goes, so the top of a large file is readable before the
+bottom has been reached.
+
+The tree and the text point at the same value. Selecting in the tree marks the value's bytes
+in the text — its name included — and scrolls to them, placed a third of the way down so what
+they contain is what you see; clicking in the text selects the value under the pointer in the
+tree, and a click in the margin or past the end of a line means the first thing on it. The
+search term is marked up here too, as it is everywhere else the document's text is shown, so
+a hit found in the results list is found again in the file the moment it is selected.
+
+**Read a column at a time, not a record at a time.** A tree is how you find your way around a
+document; it is not how anyone reads an array of a million records. The `Table` panel draws one
+as a grid, and what makes it affordable is a scan that already existed. Listing a container's
+children goes one level further down to count each child's contents, and it can pick up named
+values while it is there — the same mechanism that shows a pinned key on every row of the tree.
+So the columns are inferred from the first fifty records, and then every cell of every row comes
+out of one further pass over the array. A hundred-megabyte file of a million records becomes a
+table in under a second.
+
+Clicking a heading sorts by that column, again reverses it, and again puts the records back in
+the order the file writes them — which for a log is the only order that means anything, so a
+table that could not be put back would have taken something away. Numbers sort as numbers: a
+column of 1, 2, 10 read as text is 1, 10, 2, which is wrong in the way that makes somebody stop
+trusting a table. Records without the property go last whichever way the column points, because
+an absence is not a value that belongs at either end. And a filter narrows the records to those
+mentioning some text, in any column — a different question from the toolbar search, which reads
+the whole file rather than the records already in hand.
+
+The columns are the property names in the order the records first mention them, because JSON has
+nothing to declare them with. Only the first fifty are looked at: a serialiser that writes a
+field on record eight million and on none before it is describing an exception, not a column, and
+reading every record to find out would mean reading the whole file to draw the first screen. An
+array whose elements are not all objects has no columns worth drawing, and the panel says so
+rather than showing an empty grid.
+
+**Read what is there, say what is wrong with it.** Configuration files written by hand are full
+of comments and trailing commas, and a reader that refuses them leaves somebody staring at a
+document they can plainly see is there. So the first refusal switches the tree to reading
+leniently, once, for the whole document, and says so — in the status bar and on a chip in the
+panel header, because it changes what the rows below mean. Inspection stays strict: reporting
+that the file is not portable JSON, and explaining that a comment is a comment rather than an
+unexpected `/`, is exactly its job.
+
+A document that is broken beyond that opens the branch onto the reason, at the line and column
+where it stops making sense, and the rest of the tree stays usable. Nothing a file contains is
+allowed to end the process: a syntax error is a thing to be told about, not a thing to fall over,
+and a bug that gets past the operation that should have reported it costs a message rather than
+the document somebody had open with unsaved work in it.
+
+**Sort properties without touching the file.** A record whose forty keys arrive in whatever
+order a serialiser emitted them is read by hunting, and the fix is usually to look at it
+differently rather than to rewrite it. `A→Z` and `Z→A` in the panel header reorder what the tree
+lists; the document keeps the order it was written in. Array elements are never reordered, in
+the view or otherwise: an element is identified by its position, so moving one would not be a
+different view of the same data — it would be different data, and every index pointing into it
+would be wrong.
+
+When the order should be in the file too, `Apply order` writes it there as an ordinary edit —
+one step of undo however many objects it reached, and nothing on disk until Save. The rewrite is
+a permutation of bytes the document already holds: each member is copied with the exact name,
+colon and value it was written with, so numbers keep their digits and strings keep their
+escapes. What stays still is the separators — the comma, the newline, the indentation of the
+next line — because they belong to the position and not to the member that moves into it. Carry
+each member's trailing comma with it instead and the member that ends up last takes a comma it
+should not have, which is a document that no longer parses. Right-clicking a container sorts
+just that one.
+
+**One session per file.** Everything that belongs to a document — its tree, its search, its
+findings, its pending edits — lives in that document's own session, so opening a second file
+opens a second session rather than swapping the contents of one. Switching tabs changes which
+session is on screen and nothing else: neither loses its place, its search results, or its
+unsaved work, and a modified tab carries the same mark the window title does. The place kept
+includes the scroll position: the one tree control serves every tab, so where each document
+was scrolled to is copied out when its tab is left and back in when it is shown again. Tabs
+drag into whatever order suits, close with the middle button or Ctrl+W, and the one closed by
+mistake comes back where it was with Ctrl+Shift+T.
+
+**Edit without rewriting the file.** The whole design rests on values being byte offsets into a
+file that is never copied, and editing breaks that: change one character near the front and
+every offset behind it moves. So an edited document is a **piece table** — an ordered list of
+slices of the untouched original and of an append-only buffer of everything typed since. An
+edit splits at most two pieces and inserts one, which costs the same whether the file is a
+kilobyte or a gigabyte, and undo is simply the previous list.
+
+That change reached nothing else. Scanning, indexing, searching, inspecting and comparing all
+read their document through `JsonSource` and ask only for a length and some bytes at an offset,
+which a piece table can answer; so the same code walks an edited document as walks a file on
+disk and cannot tell the difference.
+
+A value is replaced by typing JSON into the value pane, which is parsed before it is accepted;
+keys are renamed, members added, and members deleted along with the comma that joined them to
+their neighbours. Saving streams the pieces to a file beside the original and moves it into
+place, so an interrupted save leaves the original whole.
+
+**Pin a key, read it on the parent.** Right-clicking a property pins its name, and every
+container that has a property by that name shows its value on its own row — so an array of
+records can be scanned without opening any of them. The values cost nothing to collect: the
+scan that lists a container's children is already inside each child, one level down, counting
+its contents, so it picks up the pinned names on the way past.
+
+The interface follows from the same idea. Every colour is a named token defined once per theme
+in `Styles/Tokens.axaml`, so light and dark are not two designs; values are written the way
+they appear in the document, quotes and all, because the difference between `2006` and
+`"2006"` is exactly what this application exists to make visible; and each panel says what it
+would show rather than sitting empty until something has been run.
+
+## Releasing
+
+Pushing a version tag builds the release and publishes it:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+`.github/workflows/release.yml` restores, builds, runs both test projects, and publishes a
+self-contained single-file `win-x64` build, so the download runs on a machine with no .NET on
+it. The archive goes to a GitHub release along with its SHA-256, cut with the `gh` that is on
+the runner rather than a third-party action that would have to be trusted with the token.
+
+Self-contained means the runtime travels with the application, and compressing the single file
+brings that to 46 MB. Trimming takes it to **20 MB** by leaving out the framework this
+application never calls, which is worth having and is only safe because of two things: the
+bindings are compiled rather than resolved by reflection, and nothing in the code asks the
+trimmer to keep types it cannot see. The one place that did was a serializer used to escape a
+property name — a reflection-based API doing a job of a dozen lines, which is now those dozen
+lines.
+
+The tag has to agree with `VersionPrefix` in `Directory.Build.props`, and the run fails if it
+does not. The application shows its version in the status bar and reads it from the assembly it
+was built into, so a tag saying one thing while the build says another would produce a release
+nobody could identify afterwards. Bumping that one property is what makes a release.
+
+Running the workflow by hand builds and tests everything and keeps the archive as an artifact
+without publishing anything, which is how to check a change to the workflow itself.
+
+
+## Known limits
+
+Each of these is a decision rather than an oversight, and the reason is what a fix has to
+answer.
+
+- **Undo does not survive a save.** Saving in place means releasing the mapping the document is
+  read through and opening the new file, which the recorded snapshots cannot survive; keeping
+  them would mean holding the old file open until the application closes.
+- **A value larger than 64 MB cannot be sorted.** Reordering rewrites the value in memory, which
+  is the one thing the rest of the toolbox never does, so past that size it is refused with a
+  reason rather than attempted. Doing it properly means streaming the rewrite to a temporary
+  file and handing the piece table a slice of that, instead of building the bytes up front.
+- **A value too large to show as text cannot be edited.** The pane shows a truncated rendering,
+  and writing a truncated value back would delete the rest of it.
