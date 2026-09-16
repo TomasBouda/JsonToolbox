@@ -61,8 +61,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public ComparisonViewModel Comparison { get; }
 
+    /// <summary>The Ctrl+K palette over everything this window can do.</summary>
+    public CommandPaletteViewModel Palette { get; }
+
     public MainWindowViewModel()
     {
+        Palette = new CommandPaletteViewModel(this);
+        Documents.CollectionChanged += (_, _) => OnPropertyChanged(nameof(DocumentSummary));
+
         // The picker is resolved at the moment it is needed rather than captured here, because
         // the view supplies it after this object exists.
         Comparison = new ComparisonViewModel(
@@ -248,6 +254,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (e.PropertyName == nameof(DocumentSession.TabTitle))
             {
                 OnPropertyChanged(nameof(Title));
+                OnPropertyChanged(nameof(DocumentSummary));
             }
         };
 
@@ -453,9 +460,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // ---- The window itself -------------------------------------------------------------
 
     /// <summary>
-    /// Cycles the application between following the system theme and being pinned to light or
-    /// dark, in that order.
+    /// Switches between light and dark, and remembers the choice for the next start.
     /// </summary>
+    /// <remarks>
+    /// The first start follows the operating system; after that the application keeps the
+    /// theme it was last left in, because a preference expressed once should not have to be
+    /// expressed every morning.
+    /// </remarks>
     [RelayCommand]
     private static void ToggleTheme()
     {
@@ -464,11 +475,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        app.RequestedThemeVariant = app.RequestedThemeVariant switch
+        ThemeVariant next = app.ActualThemeVariant == ThemeVariant.Dark ? ThemeVariant.Light : ThemeVariant.Dark;
+        app.RequestedThemeVariant = next;
+
+        UserSettings settings = UserSettings.Load();
+        settings.Theme = next == ThemeVariant.Dark ? "Dark" : "Light";
+        settings.Save();
+    }
+
+    /// <summary>What the status bar says about the window: how many documents, how many unsaved.</summary>
+    public string DocumentSummary
+    {
+        get
         {
-            var v when v == ThemeVariant.Light => ThemeVariant.Dark,
-            var v when v == ThemeVariant.Dark => ThemeVariant.Default,
-            _ => ThemeVariant.Light,
-        };
+            int count = Documents.Count;
+            int modified = Documents.Count(d => d.IsModified);
+            string documents = count == 1 ? "1 document" : $"{count} documents";
+            return modified > 0 ? $"{documents} · {modified} unsaved" : documents;
+        }
     }
 }

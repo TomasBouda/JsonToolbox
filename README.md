@@ -32,8 +32,8 @@ large for a double, a field that is a number in a million records and a string i
   decoded.
 - **Pin a key** to see its value on every parent row, so an array of records can be scanned
   without opening any of them.
-- Tabs, light and dark themes, drag and drop, and a status bar that shows which build is
-  running.
+- A command palette (Ctrl+K), tabs, light and dark themes, drag and drop, and the build's
+  version in the header.
 
 ## Install
 
@@ -64,13 +64,16 @@ JsonToolbox --help
 
 | Keys | Action |
 | --- | --- |
+| Ctrl+K | Command palette: jump to a document, a panel or an action |
 | Ctrl+O | Open a file |
+| Ctrl+F | Focus the search box |
 | Enter in the search box | Search the document, or narrow the comparison |
 | Ctrl+Tab | Next tab |
 | Ctrl+W / middle click | Close the tab |
 | Ctrl+Shift+T | Reopen the tab closed last |
 | Ctrl+Z / Ctrl+Y | Undo / redo an edit |
 | Ctrl+S | Save |
+| Ctrl+Shift+L | Toggle light / dark |
 
 Tabs can be dragged into a different order. Right-click a property to pin it, or a container to
 sort it.
@@ -146,7 +149,8 @@ git tag v0.2.0 && git push origin v0.2.0
 
 and `.github/workflows/release.yml` builds, tests, publishes a trimmed self-contained `win-x64`
 build and attaches it to a GitHub release. The tag must match the version, and the application
-shows the version it was built with in its status bar.
+shows the version it was built with in its header. Every release gets a section in
+`CHANGELOG.md`.
 
 ## Roadmap
 

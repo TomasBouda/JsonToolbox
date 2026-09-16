@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using JsonToolbox.App.ViewModels;
 using JsonToolbox.App.Views;
@@ -13,6 +14,15 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // The first start follows the operating system; after that, whatever the theme was
+        // last left as.
+        RequestedThemeVariant = UserSettings.Load().Theme switch
+        {
+            "Dark" => ThemeVariant.Dark,
+            "Light" => ThemeVariant.Light,
+            _ => ThemeVariant.Default,
+        };
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var viewModel = new MainWindowViewModel();

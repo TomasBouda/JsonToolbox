@@ -2,12 +2,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:JsonToolbox.App.ViewModels"
         xmlns:ctl="using:JsonToolbox.App.Controls"
+        xmlns:i="https://github.com/projektanker/icons.avalonia"
         x:Class="JsonToolbox.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding Title}"
         Icon="/Assets/icon.ico"
         Width="1360" Height="860"
         MinWidth="960" MinHeight="620"
+        WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="44"
         DragDrop.AllowDrop="True">
 
   <Window.KeyBindings>
@@ -19,6 +23,7 @@
     <KeyBinding Gesture="Ctrl+Tab" Command="{Binding SwitchViewCommand}" />
     <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseViewCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+T" Command="{Binding ReopenClosedCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+L" Command="{Binding ToggleThemeCommand}" />
   </Window.KeyBindings>
 
   <Window.Resources>
@@ -28,7 +33,7 @@
       <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,2">
         <TextBlock Grid.Column="0" Classes="key" Text="{Binding Header}" VerticalAlignment="Center" />
         <TextBlock Grid.Column="1" Text=" : " Margin="0,0,3,0"
-                   Foreground="{DynamicResource TextTertiary}"
+                   Foreground="{DynamicResource TextMutedBrush}"
                    IsVisible="{Binding ShowsPreview}" VerticalAlignment="Center" />
         <ctl:DiffValueTextBlock Grid.Column="2"
                                 Classes="value"
@@ -42,7 +47,7 @@
                                 Text="{Binding Preview}"
                                 Counterpart="{Binding Counterpart}"
                                 IsVisible="{Binding ShowsPreview}"
-                                FontFamily="{StaticResource MonoFont}" FontSize="12.5"
+                                FontFamily="{StaticResource MonoFont}" FontSize="12"
                                 TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
         <Border Grid.Column="3" Classes="chip" Margin="8,0,4,0"
                 IsVisible="{Binding CountBadge, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -52,287 +57,269 @@
     </DataTemplate>
   </Window.Resources>
 
-  <DockPanel>
+  <Panel>
+    <Grid RowDefinitions="44,Auto,Auto,*,Auto">
 
-    <!-- ===================================================================== Toolbar -->
+      <!-- ====================================================================== Header -->
+      <!-- The header is the title bar: the window's own is hidden and this row takes its
+           place, so dragging it moves the window. The right padding leaves room for the
+           caption buttons the platform still draws. -->
+      <Border Grid.Row="0" Name="HeaderBar" Classes="hairline-b"
+              Padding="14,0,150,0" Background="Transparent"
+              PointerPressed="OnHeaderPointerPressed">
+        <Grid ColumnDefinitions="Auto,12,360,*,Auto,12,Auto" VerticalAlignment="Center">
 
-    <Border Classes="toolbar" DockPanel.Dock="Top">
-      <Grid ColumnDefinitions="Auto,*,Auto">
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <!-- The leading {} is the XAML escape that stops a literal brace from being read
+                 as the start of a markup extension. -->
+            <TextBlock Text="{}{ }" FontFamily="{StaticResource MonoFont}" FontSize="13" FontWeight="Bold"
+                       Foreground="{DynamicResource LogoBrush}" VerticalAlignment="Center" />
+            <TextBlock Text="JSON Toolbox" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+          </StackPanel>
 
-        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Button Command="{Binding OpenCommand}" ToolTip.Tip="Open a JSON document (Ctrl+O)">
-            <StackPanel Orientation="Horizontal" Spacing="7">
-              <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" />
-              <TextBlock Text="Open" />
-            </StackPanel>
+          <!-- Command palette trigger -->
+          <Button Grid.Column="2" Name="PaletteButton" Click="OnPaletteButtonClick"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                  Padding="10,5" Background="{DynamicResource PanelBrush}"
+                  BorderBrush="{DynamicResource HairlineStrongBrush}"
+                  ToolTip.Tip="Jump to a document, a panel or an action (Ctrl+K)">
+            <Grid ColumnDefinitions="Auto,8,*,Auto">
+              <i:Icon Grid.Column="0" Value="fa-solid fa-magnifying-glass" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+              <TextBlock Grid.Column="2" Text="Jump to document or action…" Classes="muted" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4">
+                <Border Classes="kbd"><TextBlock Text="Ctrl" /></Border>
+                <Border Classes="kbd"><TextBlock Text="K" /></Border>
+              </StackPanel>
+            </Grid>
           </Button>
 
-          <Button Classes="accent"
-                  Command="{Binding ActiveDocument.InspectCommand}"
-                  IsEnabled="{Binding HasDocument}"
-                  ToolTip.Tip="Read the whole document and report problems and structure">
-            <StackPanel Orientation="Horizontal" Spacing="7">
-              <PathIcon Data="{StaticResource IconInspect}" Width="14" Height="14" />
-              <TextBlock Text="Inspect" />
-            </StackPanel>
+          <Button Grid.Column="4" Classes="icon" Command="{Binding ToggleThemeCommand}"
+                  ToolTip.Tip="Toggle light / dark (Ctrl+Shift+L)">
+            <i:Icon Value="fa-solid fa-circle-half-stroke" FontSize="13" />
           </Button>
+          <TextBlock Grid.Column="6" Classes="mono muted" FontSize="11"
+                     Text="{Binding Version, StringFormat='v{0}'}" VerticalAlignment="Center" />
+        </Grid>
+      </Border>
 
-          <Button Command="{Binding CompareCommand}"
-                  ToolTip.Tip="Open the comparison panel and choose the two documents to compare, by structure rather than by text">
-            <StackPanel Orientation="Horizontal" Spacing="7">
-              <PathIcon Data="{StaticResource IconCompare}" Width="13" Height="13" />
-              <TextBlock Text="Compare…" />
-            </StackPanel>
-          </Button>
+      <!-- ============================================================== Document tabs -->
+      <Border Grid.Row="1" Classes="hairline-b" Padding="10,0" IsVisible="{Binding HasDocument}">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+          <StackPanel Orientation="Horizontal" Spacing="2">
 
-          <Border Width="1" Height="20" Margin="2,0" Background="{DynamicResource BorderSubtle}" />
+            <!-- One tab per open file. The mark on a modified tab is the same one the window
+                 title carries, so the two never disagree about which file has unsaved work. -->
+            <ItemsControl Name="DocumentTabs" ItemsSource="{Binding Documents}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" Spacing="2" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:DocumentSession">
+                  <Button Classes="tab" Classes.active="{Binding IsActive}"
+                          Command="{Binding ActivateCommand}"
+                          ToolTip.Tip="{Binding Name}">
+                    <!-- Dragged to reorder, middle-clicked to close: see TabDragging. -->
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                      <i:Icon Value="fa-regular fa-file-lines" FontSize="11" />
+                      <TextBlock Text="{Binding TabTitle}" />
+                      <Button Classes="tabclose" Command="{Binding CloseCommand}" ToolTip.Tip="Close this document">
+                        <i:Icon Value="fa-solid fa-xmark" FontSize="10" />
+                      </Button>
+                    </StackPanel>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
 
-          <Button Classes="quiet" Content="↶" FontSize="15" ToolTip.Tip="Undo"
-                  Command="{Binding ActiveDocument.UndoCommand}" IsEnabled="{Binding ActiveDocument.CanUndo}" />
-          <Button Classes="quiet" Content="↷" FontSize="15" ToolTip.Tip="Redo"
-                  Command="{Binding ActiveDocument.RedoCommand}" IsEnabled="{Binding ActiveDocument.CanRedo}" />
-          <Button Content="Save" Command="{Binding ActiveDocument.SaveCommand}"
-                  IsEnabled="{Binding ActiveDocument.IsModified}"
-                  ToolTip.Tip="Write the changes back to the file" />
+            <Button Classes="tab" Classes.active="{Binding IsDiffOpen}"
+                    Command="{Binding ShowComparisonCommand}"
+                    IsVisible="{Binding HasComparison}"
+                    ToolTip.Tip="The two documents side by side — Ctrl+Tab cycles the tabs">
+              <StackPanel Orientation="Horizontal" Spacing="7">
+                <i:Icon Value="fa-solid fa-code-compare" FontSize="11" />
+                <TextBlock Text="{Binding Comparison.TabTitle}" />
+                <Button Classes="tabclose" Command="{Binding CloseComparisonCommand}" ToolTip.Tip="Close the comparison">
+                  <i:Icon Value="fa-solid fa-xmark" FontSize="10" />
+                </Button>
+              </StackPanel>
+            </Button>
+
+            <Button Classes="icon small" Margin="6,0,0,0" VerticalAlignment="Center"
+                    Command="{Binding OpenCommand}" ToolTip.Tip="Open another file (Ctrl+O)">
+              <i:Icon Value="fa-solid fa-plus" FontSize="11" />
+            </Button>
+
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+
+      <!-- ================================================================== Title row -->
+      <!-- What is on screen, the one search box, and the actions on it. -->
+      <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" Margin="18,10,18,8"
+            IsVisible="{Binding HasDocument}">
+
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <TextBlock Classes="title" Text="{Binding ActiveDocument.Name}" IsVisible="{Binding !IsDiffOpen}" />
+          <TextBlock Classes="title" Text="Comparison" IsVisible="{Binding IsDiffOpen}" />
+          <Border Classes="chip" IsVisible="{Binding !IsDiffOpen}">
+            <TextBlock Text="{Binding ActiveDocument.DocumentSize}" />
+          </Border>
+          <!-- Said where the document is, not only in the status bar: it changes what the
+               rows below mean, and a status message is read once. -->
+          <Border Classes="chip accent" IsVisible="{Binding ActiveDocument.IsSequence, FallbackValue=False}"
+                  ToolTip.Tip="This file holds one document per line rather than a single document. The records are shown as a list of them.">
+            <TextBlock Text="SEQUENCE" />
+          </Border>
+          <Border Classes="chip accent" IsVisible="{Binding ActiveDocument.IsReadLeniently, FallbackValue=False}"
+                  ToolTip.Tip="This file is not portable JSON. It is being read with comments and trailing commas allowed; run Inspect to see what is in it.">
+            <TextBlock Text="COMMENTS ALLOWED" />
+          </Border>
         </StackPanel>
 
         <!-- Search: the field carries its own icon and the modifiers sit inside it, so the
-             whole query reads as one control rather than as a field plus a row of settings. -->
+             whole query reads as one control rather than as a field plus a row of settings.
+             One box for whatever is on screen: it searches the document on a document tab
+             and narrows the differences on the comparison tab. The modifiers belong to
+             searching a file, so they step aside when the comparison is what is being looked
+             at, where the filter is over what has already been found. -->
         <Border Grid.Column="1"
-                Margin="16,0"
-                MaxWidth="720"
+                Margin="18,0"
+                MaxWidth="640"
                 HorizontalAlignment="Stretch"
-                Background="{DynamicResource SurfaceSunken}"
-                CornerRadius="{StaticResource ControlRadius}"
-                Padding="4">
+                Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource HairlineStrongBrush}" BorderThickness="1"
+                CornerRadius="5"
+                Padding="4,2">
           <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-
-            <PathIcon Grid.Column="0"
-                      Data="{StaticResource IconSearch}"
-                      Width="13" Height="13"
-                      Margin="8,0,4,0"
-                      Foreground="{DynamicResource TextTertiary}" />
-
-            <!-- One box for whatever is on screen: it searches the document on a document tab
-                 and narrows the differences on the comparison tab. The modifiers below belong
-                 to searching a file, so they step aside when the comparison is what is being
-                 looked at, where the filter is over what has already been found. -->
-            <TextBox Grid.Column="1"
-                     Classes="flat"
+            <i:Icon Grid.Column="0" Value="fa-solid fa-magnifying-glass" FontSize="11"
+                    Margin="6,0,4,0" Foreground="{DynamicResource TextMutedBrush}" />
+            <TextBox Grid.Column="1" Name="SearchBox"
+                     Classes="bare"
                      Watermark="{Binding SearchWatermark}"
                      Text="{Binding SearchText}"
                      IsEnabled="{Binding CanSearch}"
+                     Margin="4,0"
                      VerticalAlignment="Center">
               <TextBox.KeyBindings>
                 <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
               </TextBox.KeyBindings>
             </TextBox>
-
             <TextBlock Grid.Column="2" Classes="caption" Margin="6,0"
                        Text="{Binding SearchSummary}"
                        IsVisible="{Binding IsSearchingComparison}"
                        VerticalAlignment="Center" />
-
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
                         IsVisible="{Binding !IsSearchingComparison}">
               <ToggleButton Classes="chip" Content="Aa" IsChecked="{Binding ActiveDocument.CaseSensitive}" ToolTip.Tip="Match case" />
               <ToggleButton Classes="chip" Content=".*" IsChecked="{Binding ActiveDocument.UseRegex}" ToolTip.Tip="Regular expression" />
               <ToggleButton Classes="chip" Content="ab|" IsChecked="{Binding ActiveDocument.WholeWord}" ToolTip.Tip="Whole word" />
-              <Border Width="1" Height="16" Margin="4,0" Background="{DynamicResource BorderStrong}" />
+              <Border Classes="vsep" Height="14" Margin="2,0" />
               <ToggleButton Classes="chip" Content="keys" IsChecked="{Binding ActiveDocument.SearchKeys}" ToolTip.Tip="Search property names" />
               <ToggleButton Classes="chip" Content="values" IsChecked="{Binding ActiveDocument.SearchValues}" ToolTip.Tip="Search values" />
             </StackPanel>
-
-            <Button Grid.Column="3"
-                    Classes="accent"
-                    Content="Find"
-                    Height="26"
-                    Margin="6,0,0,0"
+            <Button Grid.Column="3" Classes="primary" Content="Find" Padding="10,3" Margin="6,0,0,0"
                     Command="{Binding SearchCommand}"
                     IsEnabled="{Binding CanSearch}"
                     IsVisible="{Binding !IsSearchingComparison}" />
           </Grid>
         </Border>
 
-        <Button Grid.Column="2"
-                Classes="quiet"
-                Command="{Binding ToggleThemeCommand}"
-                ToolTip.Tip="Switch between light, dark and system theme"
-                VerticalAlignment="Center">
-          <PathIcon Data="{StaticResource IconTheme}" Width="15" Height="15" />
-        </Button>
-
-      </Grid>
-    </Border>
-
-    <!-- ================================================================ Workspace tabs -->
-
-    <Border DockPanel.Dock="Top" Padding="12,0"
-            Background="{DynamicResource SurfaceBase}"
-            BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1"
-            IsVisible="{Binding HasDocument}">
-      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-        <StackPanel Orientation="Horizontal" Spacing="2">
-
-          <!-- One tab per open file. The mark on a modified tab is the same one the window
-               title carries, so the two never disagree about which file has unsaved work. -->
-          <ItemsControl Name="DocumentTabs" ItemsSource="{Binding Documents}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <StackPanel Orientation="Horizontal" Spacing="2" />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:DocumentSession">
-                <Button Classes="tab" Classes.active="{Binding IsActive}"
-                        Command="{Binding ActivateCommand}"
-                        ToolTip.Tip="{Binding Name}">
-                  <!-- Dragged to reorder, middle-clicked to close: see TabDragging. -->
-                  <StackPanel Orientation="Horizontal" Spacing="7">
-                    <PathIcon Data="{StaticResource IconDocument}" Width="11" Height="11" />
-                    <TextBlock Text="{Binding TabTitle}" />
-                    <Button Classes="tabclose" Content="✕"
-                            Command="{Binding CloseCommand}"
-                            ToolTip.Tip="Close this document" />
-                  </StackPanel>
-                </Button>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-
-          <Button Classes="tab" Classes.active="{Binding IsDiffOpen}"
-                  Command="{Binding ShowComparisonCommand}"
-                  IsVisible="{Binding HasComparison}"
-                  ToolTip.Tip="The two documents side by side — Ctrl+Tab cycles the tabs">
-            <StackPanel Orientation="Horizontal" Spacing="7">
-              <PathIcon Data="{StaticResource IconCompare}" Width="11" Height="11" />
-              <TextBlock Text="{Binding Comparison.TabTitle}" />
-              <Button Classes="tabclose" Content="✕"
-                      Command="{Binding CloseComparisonCommand}"
-                      ToolTip.Tip="Close the comparison" />
-            </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+          <Button Command="{Binding OpenCommand}" ToolTip.Tip="Open a JSON document (Ctrl+O)">
+            <StackPanel><i:Icon Value="fa-solid fa-folder-open" FontSize="11" /><TextBlock Text="Open" /></StackPanel>
           </Button>
-
-          <Button Classes="quiet" Content="+" FontSize="16" Margin="6,0,0,0"
-                  Command="{Binding OpenCommand}"
-                  ToolTip.Tip="Open another file (Ctrl+O)" />
-
+          <Button Classes="primary"
+                  Command="{Binding ActiveDocument.InspectCommand}"
+                  IsEnabled="{Binding HasDocument}"
+                  ToolTip.Tip="Read the whole document and report problems and structure">
+            <StackPanel><i:Icon Value="fa-solid fa-wand-magic-sparkles" FontSize="11" /><TextBlock Text="Inspect" /></StackPanel>
+          </Button>
+          <Button Command="{Binding CompareCommand}"
+                  ToolTip.Tip="Open the comparison panel and choose the two documents to compare, by structure rather than by text">
+            <StackPanel><i:Icon Value="fa-solid fa-code-compare" FontSize="11" /><TextBlock Text="Compare…" /></StackPanel>
+          </Button>
+          <Border Classes="vsep" />
+          <Button Classes="icon" ToolTip.Tip="Undo (Ctrl+Z)"
+                  Command="{Binding ActiveDocument.UndoCommand}" IsEnabled="{Binding ActiveDocument.CanUndo}">
+            <i:Icon Value="fa-solid fa-rotate-left" FontSize="12" />
+          </Button>
+          <Button Classes="icon" ToolTip.Tip="Redo (Ctrl+Y)"
+                  Command="{Binding ActiveDocument.RedoCommand}" IsEnabled="{Binding ActiveDocument.CanRedo}">
+            <i:Icon Value="fa-solid fa-rotate-right" FontSize="12" />
+          </Button>
+          <Button Command="{Binding ActiveDocument.SaveCommand}"
+                  IsEnabled="{Binding ActiveDocument.IsModified}"
+                  ToolTip.Tip="Write the changes back to the file (Ctrl+S)">
+            <StackPanel><i:Icon Value="fa-solid fa-floppy-disk" FontSize="11" /><TextBlock Text="Save" /></StackPanel>
+          </Button>
         </StackPanel>
-      </ScrollViewer>
-    </Border>
-
-    <!-- =================================================================== Status bar -->
-
-    <Border Classes="statusbar" DockPanel.Dock="Bottom">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-
-        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
-                    IsVisible="{Binding HasDocument}">
-          <PathIcon Data="{StaticResource IconDocument}" Width="12" Height="12"
-                    Foreground="{DynamicResource TextTertiary}" />
-          <TextBlock Text="{Binding ActiveDocument.Name}" FontWeight="Medium" VerticalAlignment="Center" />
-          <Border Classes="chip">
-            <TextBlock Text="{Binding ActiveDocument.DocumentSize}" />
-          </Border>
-        </StackPanel>
-
-        <TextBlock Grid.Column="1"
-                   Classes="secondary"
-                   Text="{Binding StatusText}"
-                   Margin="14,0"
-                   VerticalAlignment="Center"
-                   TextTrimming="CharacterEllipsis" />
-
-        <ProgressBar Grid.Column="2"
-                     Width="120" Height="3" Margin="0,0,12,0"
-                     Minimum="0" Maximum="1" Value="{Binding Progress}"
-                     IsVisible="{Binding IsBusy}"
-                     VerticalAlignment="Center" />
-
-        <TextBlock Grid.Column="3"
-                   Classes="caption"
-                   Text="{Binding Version, StringFormat='v{0}'}"
-                   VerticalAlignment="Center" />
       </Grid>
-    </Border>
 
-    <!-- ======================================================================== Body -->
+      <!-- ========================================================================== Body -->
+      <Panel Grid.Row="3">
 
-    <Panel>
-
-      <!-- Empty state. Shown instead of two blank panes, and doubles as the drop target
-           hint, because dragging a file in is the fastest way to start. -->
-      <Border>
-        <Border.IsVisible>
-          <MultiBinding Converter="{x:Static BoolConverters.And}">
-            <Binding Path="!HasDocument" />
-            <Binding Path="!IsDiffOpen" />
-          </MultiBinding>
-        </Border.IsVisible>
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14" MaxWidth="380">
-
-          <!-- Braces rather than a page icon: at this size a glyph reads as the subject of
-               the application, where a generic document silhouette reads as nothing. -->
-          <Border Width="76" Height="76" CornerRadius="16"
-                  Background="{DynamicResource AccentSoft}"
-                  HorizontalAlignment="Center">
-            <!-- The leading {} is the XAML escape that stops a literal brace from being read
-                 as the start of a markup extension. -->
-            <TextBlock Text="{}{ }"
-                       FontFamily="{StaticResource MonoFont}"
-                       FontSize="30" FontWeight="SemiBold"
-                       Foreground="{DynamicResource AccentBase}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </Border>
-
-          <TextBlock Text="No document open"
-                     FontSize="16" FontWeight="SemiBold"
-                     HorizontalAlignment="Center" />
-          <TextBlock Classes="secondary"
-                     Text="Drop a JSON file here, or open one. Files of any size are welcome — nothing is read until you look at it."
-                     TextWrapping="Wrap" TextAlignment="Center" />
-          <Button Classes="accent" Content="Open a file…"
-                  Command="{Binding OpenCommand}"
-                  HorizontalAlignment="Center" Margin="0,4,0,0" />
+        <!-- Empty state. Shown instead of two blank panes, and doubles as the drop target
+             hint, because dragging a file in is the fastest way to start. -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Classes="fade-in">
+          <StackPanel.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="!HasDocument" />
+              <Binding Path="!IsDiffOpen" />
+            </MultiBinding>
+          </StackPanel.IsVisible>
+          <TextBlock Text="{}{ }" FontFamily="{StaticResource MonoFont}" FontSize="28" FontWeight="Bold"
+                     Foreground="{DynamicResource TextFaintBrush}" HorizontalAlignment="Center" />
+          <TextBlock Text="Drop a JSON file here, or open one" Classes="secondary" FontSize="14" HorizontalAlignment="Center" />
+          <TextBlock Classes="muted" FontSize="11" HorizontalAlignment="Center"
+                     Text="Files of any size are welcome — nothing is read until you look at it." />
+          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" Margin="0,6,0,0">
+            <Border Classes="kbd"><TextBlock Text="Ctrl" /></Border>
+            <Border Classes="kbd"><TextBlock Text="O" /></Border>
+            <TextBlock Classes="muted" FontSize="11" Text="to open" VerticalAlignment="Center" />
+            <TextBlock Classes="faint" FontSize="11" Text="·" VerticalAlignment="Center" />
+            <Border Classes="kbd"><TextBlock Text="Ctrl" /></Border>
+            <Border Classes="kbd"><TextBlock Text="K" /></Border>
+            <TextBlock Classes="muted" FontSize="11" Text="to jump anywhere" VerticalAlignment="Center" />
+          </StackPanel>
         </StackPanel>
-      </Border>
-
       <!-- ================================================================ Side by side -->
 
-      <DockPanel Margin="10"
+      <DockPanel Classes="fade-in"
                  IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsDiffOpen}"
                  DataContext="{Binding Comparison}" x:DataType="vm:ComparisonViewModel">
 
         <!-- What is being compared is chosen here rather than assumed. Each side offers the
              documents that are already open, and a button for anything else on disk. -->
-        <Border Classes="panel" DockPanel.Dock="Top" Padding="12,10" Margin="0,0,0,8">
+        <Border Classes="hairline-b" DockPanel.Dock="Top" Padding="18,8,18,10">
           <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" RowDefinitions="Auto,Auto">
 
-            <TextBlock Grid.Row="0" Grid.Column="0" Classes="sectionTitle" Text="LEFT"
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="section" Text="LEFT"
                        VerticalAlignment="Center" Margin="0,0,8,0" />
             <ComboBox Grid.Row="0" Grid.Column="1" MinWidth="200"
                       ItemsSource="{Binding Choices}"
                       SelectedItem="{Binding Left}"
                       PlaceholderText="choose a document"
                       DisplayMemberBinding="{Binding Name}" />
-            <Button Grid.Row="0" Grid.Column="2" Classes="quiet" Margin="4,0,16,0"
+            <Button Grid.Row="0" Grid.Column="2" Classes="icon" Margin="4,0,16,0"
                     Command="{Binding BrowseLeftCommand}"
                     ToolTip.Tip="Compare against a file that is not open">
-              <PathIcon Data="{StaticResource IconFolder}" Width="13" Height="13" />
+              <i:Icon Value="fa-solid fa-folder-open" FontSize="12" />
             </Button>
 
-            <TextBlock Grid.Row="0" Grid.Column="3" Classes="sectionTitle" Text="RIGHT"
+            <TextBlock Grid.Row="0" Grid.Column="3" Classes="section" Text="RIGHT"
                        VerticalAlignment="Center" Margin="0,0,8,0" />
             <ComboBox Grid.Row="0" Grid.Column="4" MinWidth="200"
                       ItemsSource="{Binding Choices}"
                       SelectedItem="{Binding Right}"
                       PlaceholderText="choose a document"
                       DisplayMemberBinding="{Binding Name}" />
-            <Button Grid.Row="0" Grid.Column="5" Classes="quiet" Margin="4,0,0,0"
+            <Button Grid.Row="0" Grid.Column="5" Classes="icon" Margin="4,0,0,0"
                     HorizontalAlignment="Left"
                     Command="{Binding BrowseRightCommand}"
                     ToolTip.Tip="Compare against a file that is not open">
-              <PathIcon Data="{StaticResource IconFolder}" Width="13" Height="13" />
+              <i:Icon Value="fa-solid fa-folder-open" FontSize="12" />
             </Button>
 
             <ToggleButton Grid.Row="0" Grid.Column="6" Classes="chip" Content="changes only"
@@ -347,7 +334,7 @@
           </Grid>
         </Border>
 
-        <Border Classes="panel">
+        <Border>
           <Panel>
 
             <!-- Before both sides are chosen the panel says what it is waiting for, rather
@@ -366,11 +353,11 @@
             <DockPanel IsVisible="{Binding HasResult}">
             <Grid DockPanel.Dock="Top" ColumnDefinitions="*,1,*">
               <Border Grid.Column="0" Classes="paneHeader" BorderThickness="0,0,0,1">
-                <TextBlock Classes="sectionTitle" Text="{Binding Tree.LeftName}" VerticalAlignment="Center" />
+                <TextBlock Classes="section" Text="{Binding Tree.LeftName}" VerticalAlignment="Center" />
               </Border>
-              <Border Grid.Column="1" Background="{DynamicResource BorderSubtle}" />
+              <Border Grid.Column="1" Background="{DynamicResource HairlineBrush}" />
               <Border Grid.Column="2" Classes="paneHeader" BorderThickness="0,0,0,1">
-                <TextBlock Classes="sectionTitle" Text="{Binding Tree.RightName}" VerticalAlignment="Center" />
+                <TextBlock Classes="section" Text="{Binding Tree.RightName}" VerticalAlignment="Center" />
               </Border>
             </Grid>
 
@@ -398,14 +385,17 @@
                                 Classes.open="{Binding IsExpanded}"
                                 Command="{Binding ToggleCommand}"
                                 IsVisible="{Binding ShowsLeftExpander}">
-                          <PathIcon Data="{StaticResource IconChevron}" Width="8" Height="8" />
+                          <Panel>
+                        <i:Icon Value="fa-solid fa-chevron-right" FontSize="8" IsVisible="{Binding !IsExpanded}" />
+                        <i:Icon Value="fa-solid fa-chevron-down" FontSize="8" IsVisible="{Binding IsExpanded}" />
+                      </Panel>
                         </Button>
 
                         <ContentControl Grid.Column="1" Content="{Binding Left}"
                                         IsVisible="{Binding HasLeft}"
                                         ContentTemplate="{StaticResource DiffSideTemplate}" />
 
-                        <Button Grid.Column="1" Classes="quiet more"
+                        <Button Grid.Column="1" Classes="more"
                                 IsVisible="{Binding IsMoreRow}"
                                 IsEnabled="{Binding CanShowMore}"
                                 Content="{Binding MoreText}"
@@ -413,14 +403,17 @@
                                 HorizontalAlignment="Left" />
                       </Grid>
 
-                      <Border Grid.Column="1" Background="{DynamicResource BorderSubtle}" />
+                      <Border Grid.Column="1" Background="{DynamicResource HairlineBrush}" />
 
                       <Grid Grid.Column="2" ColumnDefinitions="Auto,*" Margin="{Binding IndentMargin}">
                         <Button Grid.Column="0" Classes="expander"
                                 Classes.open="{Binding IsExpanded}"
                                 Command="{Binding ToggleCommand}"
                                 IsVisible="{Binding ShowsRightExpander}">
-                          <PathIcon Data="{StaticResource IconChevron}" Width="8" Height="8" />
+                          <Panel>
+                        <i:Icon Value="fa-solid fa-chevron-right" FontSize="8" IsVisible="{Binding !IsExpanded}" />
+                        <i:Icon Value="fa-solid fa-chevron-down" FontSize="8" IsVisible="{Binding IsExpanded}" />
+                      </Panel>
                         </Button>
 
                         <ContentControl Grid.Column="1" Content="{Binding Right}"
@@ -449,15 +442,15 @@
         <ContentControl.ContentTemplate>
           <DataTemplate x:DataType="vm:DocumentSession">
 
-      <Grid ColumnDefinitions="2*,6,3*" Margin="10,10,10,10">
+      <Grid ColumnDefinitions="2*,6,3*" Classes="fade-in">
 
         <!-- =================================================================== Tree -->
 
-        <Border Grid.Column="0" Classes="panel">
+        <Border Grid.Column="0">
           <DockPanel>
             <Border Classes="paneHeader" DockPanel.Dock="Top">
               <Grid ColumnDefinitions="Auto,Auto,*,Auto">
-                <TextBlock Grid.Column="0" Classes="sectionTitle" Text="DOCUMENT" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="0" Classes="section" Text="DOCUMENT" VerticalAlignment="Center" />
 
                 <!-- How the properties of an object are listed. This is a way of looking at the
                      document; Apply is what writes the order into it. -->
@@ -471,25 +464,11 @@
                                 ToolTip.Tip="List the properties of every object by name, Z to A" />
                   <!-- Named for what it applies: the value pane has an Apply of its own, and
                        two buttons reading "Apply" in one window is one too many. -->
-                  <Button Classes="quiet" Content="Apply order" FontSize="11"
-                          Height="22" Margin="4,0,0,0" VerticalAlignment="Center"
+                  <Button Classes="ghost" Content="Apply order" FontSize="11"
+                          Margin="4,0,0,0" VerticalAlignment="Center"
                           Command="{Binding ApplyOrderCommand}"
                           IsVisible="{Binding CanApplyOrder}"
                           ToolTip.Tip="Write this order into the document itself, as an edit you can undo" />
-
-                  <!-- Said where the document is, not only in the status bar: it changes what
-                       the rows below mean, and a status message is read once. -->
-                  <Border Classes="chip" Margin="10,0,0,0" VerticalAlignment="Center"
-                          IsVisible="{Binding IsSequence}"
-                          ToolTip.Tip="This file holds one document per line rather than a single document. The records are shown as a list of them.">
-                    <TextBlock Text="sequence" />
-                  </Border>
-
-                  <Border Classes="chip" Margin="10,0,0,0" VerticalAlignment="Center"
-                          IsVisible="{Binding IsReadLeniently}"
-                          ToolTip.Tip="This file is not portable JSON. It is being read with comments and trailing commas allowed; run Inspect to see what is in it.">
-                    <TextBlock Text="comments allowed" />
-                  </Border>
                 </StackPanel>
 
                 <!-- What is currently pinned, and the way back out. Right-clicking a property
@@ -510,11 +489,33 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <Button Grid.Column="3" Classes="quiet" Content="Clear pins" FontSize="11"
-                        Height="22" VerticalAlignment="Center"
+                <Button Grid.Column="3" Classes="ghost" Content="Clear pins" FontSize="11"
+                        VerticalAlignment="Center"
                         Command="{Binding ClearPinsCommand}"
                         IsVisible="{Binding !Pinned.IsEmpty}" />
               </Grid>
+            </Border>
+
+            <!-- The keys a reader reaches for most, listed where the reference sidebar lists them. -->
+            <Border DockPanel.Dock="Bottom" Classes="hairline-t" Padding="14,8">
+              <StackPanel Orientation="Horizontal" Spacing="14">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <Border Classes="kbd"><TextBlock Text="Ctrl+F" /></Border>
+                  <TextBlock Classes="muted" FontSize="10.5" Text="search" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <Border Classes="kbd"><TextBlock Text="Ctrl+K" /></Border>
+                  <TextBlock Classes="muted" FontSize="10.5" Text="jump" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <Border Classes="kbd"><TextBlock Text="Ctrl+Tab" /></Border>
+                  <TextBlock Classes="muted" FontSize="10.5" Text="next tab" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <Border Classes="kbd"><TextBlock Text="Ctrl+S" /></Border>
+                  <TextBlock Classes="muted" FontSize="10.5" Text="save" VerticalAlignment="Center" />
+                </StackPanel>
+              </StackPanel>
             </Border>
 
             <!--
@@ -525,7 +526,7 @@
             <ListBox Name="TreeRows" ctl:ScrollMemory.Keep="tree"
                      ItemsSource="{Binding Tree.Rows}"
                      SelectedItem="{Binding SelectedNode}"
-                     Classes="rows">
+                     Classes="rows tree">
               <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
                   <VirtualizingStackPanel />
@@ -568,7 +569,10 @@
                             Classes.open="{Binding IsExpanded}"
                             Command="{Binding ToggleCommand}"
                             IsVisible="{Binding CanExpand}">
-                      <PathIcon Data="{StaticResource IconChevron}" Width="8" Height="8" />
+                      <Panel>
+                        <i:Icon Value="fa-solid fa-chevron-right" FontSize="8" IsVisible="{Binding !IsExpanded}" />
+                        <i:Icon Value="fa-solid fa-chevron-down" FontSize="8" IsVisible="{Binding IsExpanded}" />
+                      </Panel>
                     </Button>
 
                     <Panel Grid.Column="1" IsVisible="{Binding !IsMoreRow}">
@@ -578,11 +582,11 @@
                     <!-- The separator belongs to the value, not to the key, so a row with
                          nothing to show on the right does not end in a dangling colon. -->
                     <TextBlock Grid.Column="2" Text=" : " Margin="0,0,3,0"
-                               Foreground="{DynamicResource TextTertiary}"
+                               Foreground="{DynamicResource TextMutedBrush}"
                                IsVisible="{Binding ShowsPreview}"
                                VerticalAlignment="Center" />
 
-                    <Button Grid.Column="3" Classes="quiet more"
+                    <Button Grid.Column="3" Classes="more"
                             IsVisible="{Binding IsMoreRow}"
                             IsEnabled="{Binding CanShowMore}"
                             Content="{Binding MoreText}"
@@ -631,11 +635,12 @@
           </DockPanel>
         </Border>
 
+        <Border Grid.Column="1" Width="1" HorizontalAlignment="Center" Background="{DynamicResource HairlineBrush}" />
         <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
 
         <!-- ============================================================ Side panels -->
 
-        <Border Grid.Column="2" Classes="panel">
+        <Border Grid.Column="2">
           <TabControl SelectedIndex="{Binding SelectedPanel}">
 
             <!-- ................................................................ Value -->
@@ -643,18 +648,18 @@
               <DockPanel>
 
                 <Border DockPanel.Dock="Top" Padding="14,12"
-                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1"
+                        BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,0,0,1"
                         IsVisible="{Binding HasSelection}">
                   <StackPanel Spacing="10">
 
                     <StackPanel Spacing="4">
-                      <TextBlock Classes="sectionTitle" Text="PATH" />
+                      <TextBlock Classes="section" Text="PATH" />
                       <Grid ColumnDefinitions="*,Auto,Auto">
                         <SelectableTextBlock Grid.Column="0" Classes="path" Text="{Binding SelectedPath}"
                                              TextWrapping="Wrap" VerticalAlignment="Center" />
-                        <Button Grid.Column="1" Classes="quiet" Content="Copy" FontSize="11" Height="24"
+                        <Button Grid.Column="1" Classes="ghost" Content="Copy" FontSize="11"
                                 Command="{Binding CopyPathCommand}" ToolTip.Tip="Copy the JSONPath" />
-                        <Button Grid.Column="2" Classes="quiet" Content="Pointer" FontSize="11" Height="24"
+                        <Button Grid.Column="2" Classes="ghost" Content="Pointer" FontSize="11"
                                 Command="{Binding CopyPointerCommand}"
                                 ToolTip.Tip="{Binding SelectedPointer, StringFormat='Copy the JSON Pointer: {0}'}" />
                       </Grid>
@@ -685,21 +690,21 @@
                 </Border>
 
                 <Border DockPanel.Dock="Bottom" Padding="14,8"
-                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,1,0,0"
+                        BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0"
                         IsVisible="{Binding HasSelection}">
                   <StackPanel Spacing="6">
                     <TextBlock Classes="caption" Text="{Binding EditError}" TextWrapping="Wrap"
-                               Foreground="{DynamicResource SeverityError}"
+                               Foreground="{DynamicResource ErrorBrush}"
                                IsVisible="{Binding EditError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="accent" Content="Apply" Height="26" FontSize="12"
+                      <Button Classes="primary" Content="Apply"
                               Command="{Binding ApplyValueCommand}"
                               IsVisible="{Binding CanEditValue}" />
-                      <Button Content="Revert" Height="26" FontSize="12"
+                      <Button Content="Revert"
                               Command="{Binding RevertValueCommand}"
                               IsVisible="{Binding CanEditValue}" />
-                      <Button Classes="quiet" Content="Copy value" FontSize="11.5"
+                      <Button Classes="ghost" Content="Copy value" FontSize="11.5"
                               Command="{Binding CopyValueCommand}" />
 
                       <!-- Only for a string that turned out to hold a document of its own.
@@ -785,7 +790,7 @@
               <DockPanel>
 
                 <Border DockPanel.Dock="Top" Padding="14,8"
-                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1"
+                        BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,0,0,1"
                         IsVisible="{Binding RawText.IsBuilding, FallbackValue=False}">
                   <TextBlock Classes="caption" Text="{Binding RawText.Status}" />
                 </Border>
@@ -813,7 +818,7 @@
                                                 Mark="{Binding Owner.Mark}"
                                                 MatchBackground="{DynamicResource MatchBackground}"
                                                 MatchForeground="{DynamicResource MatchForeground}"
-                                                MarkBackground="{DynamicResource AccentSoft}"
+                                                MarkBackground="{DynamicResource AccentSoftBrush}"
                                                 FontFamily="{StaticResource MonoFont}"
                                                 FontSize="12.5"
                                                 TextWrapping="NoWrap"
@@ -830,7 +835,7 @@
               <DockPanel>
 
                 <Border DockPanel.Dock="Top" Padding="14,10"
-                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1"
+                        BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,0,0,1"
                         IsVisible="{Binding HasTable}">
                   <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Grid.Column="0" Spacing="3">
@@ -840,15 +845,15 @@
 
                     <!-- Narrows the records the table holds, which is a different question from
                          the toolbar's search over the whole file. -->
-                    <Border Grid.Column="1" Width="200" VerticalAlignment="Center"
-                            Background="{DynamicResource SurfaceSunken}"
-                            CornerRadius="{StaticResource ControlRadius}"
-                            Padding="4">
+                    <Border Grid.Column="1" Width="220" VerticalAlignment="Center"
+                            Background="{DynamicResource PanelBrush}"
+                            BorderBrush="{DynamicResource HairlineStrongBrush}" BorderThickness="1"
+                            CornerRadius="5"
+                            Padding="4,3">
                       <Grid ColumnDefinitions="Auto,*">
-                        <PathIcon Grid.Column="0" Data="{StaticResource IconSearch}"
-                                  Width="11" Height="11" Margin="6,0,4,0"
-                                  Foreground="{DynamicResource TextTertiary}" />
-                        <TextBox Grid.Column="1" Classes="flat" FontSize="12"
+                        <i:Icon Grid.Column="0" Value="fa-solid fa-filter" FontSize="10"
+                                Margin="6,0,6,0" Foreground="{DynamicResource TextMutedBrush}" />
+                        <TextBox Grid.Column="1" Classes="bare" FontSize="12"
                                  Watermark="Filter these records…"
                                  Text="{Binding Table.Filter}"
                                  VerticalAlignment="Center" />
@@ -858,12 +863,12 @@
                 </Border>
 
                 <Border DockPanel.Dock="Bottom" Padding="14,8"
-                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,1,0,0"
+                        BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0"
                         IsVisible="{Binding Table.HasMore}">
                   <!-- The label is a TextBlock rather than the button's Content: bound to
                        Content it measured as nothing and the button came out sixteen pixels
                        wide, holding text that was there and invisible. -->
-                  <Button Classes="quiet" Height="24"
+                  <Button Classes="ghost"
                           Command="{Binding Table.ShowMoreCommand}"
                           HorizontalAlignment="Left">
                     <TextBlock FontSize="11" Text="{Binding Table.MoreText}" VerticalAlignment="Center" />
@@ -1018,7 +1023,7 @@
 
                         <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
                         <TextBlock Classes="path" Text="{Binding Path}"
-                                   Foreground="{DynamicResource TextSecondary}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
                                    TextTrimming="CharacterEllipsis" />
                         <TextBlock Classes="caption" Text="{Binding Hint}" TextWrapping="Wrap"
                                    IsVisible="{Binding HasHint}" />
@@ -1034,7 +1039,7 @@
             <TabItem Header="Structure">
               <DockPanel>
                 <Border DockPanel.Dock="Top" Padding="14,10"
-                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1"
+                        BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,0,0,1"
                         IsVisible="{Binding HasInspected}">
                   <TextBlock Classes="caption" Text="{Binding InspectionSummary}" />
                 </Border>
@@ -1089,7 +1094,7 @@
 
               <DockPanel>
                 <Border DockPanel.Dock="Top" Padding="14,10"
-                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1"
+                        BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,0,0,1"
                         IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Comparison.HasResult}">
                   <StackPanel Spacing="3">
                     <TextBlock Classes="caption" Text="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).Comparison.TabTitle}" />
@@ -1171,7 +1176,7 @@
 
               <DockPanel>
                 <Border DockPanel.Dock="Top" Padding="14,10"
-                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,0,1"
+                        BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,0,0,1"
                         IsVisible="{Binding SearchSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                   <TextBlock Classes="caption" Text="{Binding SearchSummary}" TextWrapping="Wrap" />
                 </Border>
@@ -1212,6 +1217,73 @@
           </DataTemplate>
         </ContentControl.ContentTemplate>
       </ContentControl>
+      </Panel>
+
+      <!-- ==================================================================== Status bar -->
+      <Border Grid.Row="4" Classes="hairline-t" Padding="18,6">
+        <Grid ColumnDefinitions="Auto,16,Auto,*,Auto">
+          <TextBlock Grid.Column="0" Classes="muted" FontSize="11" VerticalAlignment="Center"
+                     Text="{Binding DocumentSummary}" />
+          <ProgressBar Grid.Column="2" Width="120" Height="3"
+                       Minimum="0" Maximum="1" Value="{Binding Progress}"
+                       IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="4" Classes="mono muted" FontSize="11" VerticalAlignment="Center"
+                     Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" />
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- ========================================================= Command palette (Ctrl+K) -->
+    <Panel IsVisible="{Binding Palette.IsOpen}">
+      <Border Classes="scrim" PointerPressed="OnScrimPressed" />
+      <Border Classes="popin" Width="560" VerticalAlignment="Top" Margin="0,96,0,0"
+              Background="{DynamicResource BgElevatedBrush}"
+              BorderBrush="{DynamicResource HairlineStrongBrush}" BorderThickness="1" CornerRadius="8"
+              BoxShadow="0 24 60 0 #80000000">
+        <Border CornerRadius="8" ClipToBounds="True">
+          <DockPanel>
+            <Border DockPanel.Dock="Top" Classes="hairline-b" Padding="14,8">
+              <Grid ColumnDefinitions="Auto,10,*,Auto">
+                <i:Icon Grid.Column="0" Value="fa-solid fa-magnifying-glass" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" />
+                <TextBox Grid.Column="2" Name="PaletteBox" Classes="bare mono" FontSize="13"
+                         Watermark="Type a document, a panel or an action…"
+                         Text="{Binding Palette.Query}" />
+                <Border Grid.Column="3" Classes="kbd"><TextBlock Text="Esc" /></Border>
+              </Grid>
+            </Border>
+            <Border DockPanel.Dock="Bottom" Classes="hairline-t" Padding="14,7">
+              <StackPanel Orientation="Horizontal" Spacing="14">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <Border Classes="kbd"><TextBlock Text="↑↓" /></Border>
+                  <TextBlock Classes="muted" FontSize="10.5" Text="navigate" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <Border Classes="kbd"><TextBlock Text="↵" /></Border>
+                  <TextBlock Classes="muted" FontSize="10.5" Text="run" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Classes="muted" FontSize="10.5" Text="fuzzy match across documents, panels and actions" VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
+            <ListBox Name="PaletteList" Classes="rows compact" MaxHeight="420" Margin="0,4"
+                     ItemsSource="{Binding Palette.Items}"
+                     SelectedItem="{Binding Palette.SelectedItem}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:PaletteItem">
+                  <Grid ColumnDefinitions="18,10,Auto,10,*,Auto,10,Auto">
+                    <i:Icon Grid.Column="0" Value="{Binding Icon}" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="12.5" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="4" Classes="muted" FontSize="11" Text="{Binding Hint}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="5" Classes="faint" FontSize="10.5" Text="{Binding Group}" VerticalAlignment="Center" />
+                    <Border Grid.Column="7" Classes="kbd" IsVisible="{Binding Shortcut, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                      <TextBlock Text="{Binding Shortcut}" />
+                    </Border>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
+        </Border>
+      </Border>
     </Panel>
-  </DockPanel>
+  </Panel>
 </Window>

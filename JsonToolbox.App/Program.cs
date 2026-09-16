@@ -1,4 +1,6 @@
 using Avalonia;
+using Projektanker.Icons.Avalonia;
+using Projektanker.Icons.Avalonia.FontAwesome;
 
 namespace JsonToolbox.App;
 
@@ -19,8 +21,13 @@ internal static class Program
     }
 
     /// <summary>Also used by the Avalonia design-time tooling, which requires this exact name.</summary>
-    public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<App>()
-        .UsePlatformDetect()
-        .WithInterFont()
-        .LogToTrace();
+    public static AppBuilder BuildAvaloniaApp()
+    {
+        // One icon set for the whole application, registered before any view asks for a glyph.
+        IconProvider.Current.Register<FontAwesomeIconProvider>();
+
+        return AppBuilder.Configure<App>()
+            .UsePlatformDetect()
+            .LogToTrace();
+    }
 }

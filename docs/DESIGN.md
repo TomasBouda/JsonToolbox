@@ -231,11 +231,16 @@ records can be scanned without opening any of them. The values cost nothing to c
 scan that lists a container's children is already inside each child, one level down, counting
 its contents, so it picks up the pinned names on the way past.
 
-The interface follows from the same idea. Every colour is a named token defined once per theme
-in `Styles/Tokens.axaml`, so light and dark are not two designs; values are written the way
-they appear in the document, quotes and all, because the difference between `2006` and
-`"2006"` is exactly what this application exists to make visible; and each panel says what it
-would show rather than sitting empty until something has been run.
+The interface follows from the same idea. It wears the "ops console" look the other desktop
+tools share — dense, dark-first, hairline-bordered, one accent — copied from its reference
+implementation rather than designed again: every colour is a named token defined once per
+theme in `Styles/Tokens.axaml`, and `Styles/Controls.axaml` is that shared set plus what this
+application adds. The header is the title bar, with the command palette (Ctrl+K), the theme
+toggle and the version in it; the status bar carries what is open and what last happened.
+Values are written the way they appear in the document, quotes and all, because the
+difference between `2006` and `"2006"` is exactly what this application exists to make
+visible; and each panel says what it would show rather than sitting empty until something has
+been run.
 
 ## Releasing
 
