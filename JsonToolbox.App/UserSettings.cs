@@ -16,8 +16,11 @@ public sealed class UserSettings
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "JsonToolbox", "settings.json");
 
-    /// <summary>"Dark" or "Light"; null follows the operating system preference.</summary>
+    /// <summary>"Dark" or "Light"; null follows the operating system preference live.</summary>
     public string? Theme { get; set; }
+
+    /// <summary>Version of <see cref="Theme"/>; see <see cref="ThemeModes.CurrentVersion"/>.</summary>
+    public int ThemeVersion { get; set; }
 
     public static UserSettings Load()
     {
@@ -38,6 +41,14 @@ public sealed class UserSettings
             {
                 settings.Theme = theme.GetString();
             }
+
+            if (document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("themeVersion", out JsonElement themeVersion)
+                && themeVersion.ValueKind == JsonValueKind.Number
+                && themeVersion.TryGetInt32(out int version))
+            {
+                settings.ThemeVersion = version;
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -45,6 +56,26 @@ public sealed class UserSettings
         }
 
         return settings;
+    }
+
+    /// <summary>
+    /// One-time reset of a Light/Dark choice saved by the old two-state toggle back to System, so every
+    /// installation follows Windows again; a choice made with the three-state switch is kept.
+    /// </summary>
+    public void MigrateTheme()
+    {
+        if (ThemeVersion >= ThemeModes.CurrentVersion)
+        {
+            return;
+        }
+
+        bool reset = Theme is not null;
+        Theme = null;
+        ThemeVersion = ThemeModes.CurrentVersion;
+        if (reset)
+        {
+            Save();
+        }
     }
 
     public void Save()
@@ -60,6 +91,11 @@ public sealed class UserSettings
             if (Theme is not null)
             {
                 writer.WriteString("theme", Theme);
+            }
+
+            if (ThemeVersion != 0)
+            {
+                writer.WriteNumber("themeVersion", ThemeVersion);
             }
 
             writer.WriteEndObject();

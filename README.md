@@ -32,8 +32,8 @@ large for a double, a field that is a number in a million records and a string i
   decoded.
 - **Pin a key** to see its value on every parent row, so an array of records can be scanned
   without opening any of them.
-- A command palette (Ctrl+K), tabs, light and dark themes, drag and drop, and the build's
-  version in the header.
+- A command palette (Ctrl+K), tabs, a System / Light / Dark theme switch (System follows
+  Windows live), drag and drop, and the build's version in the header.
 
 ## Install
 
@@ -73,7 +73,7 @@ JsonToolbox --help
 | Ctrl+Shift+T | Reopen the tab closed last |
 | Ctrl+Z / Ctrl+Y | Undo / redo an edit |
 | Ctrl+S | Save |
-| Ctrl+Shift+L | Toggle light / dark |
+| Ctrl+Shift+L | Cycle the theme: system → light → dark |
 
 Tabs can be dragged into a different order. Right-click a property to pin it, or a container to
 sort it.

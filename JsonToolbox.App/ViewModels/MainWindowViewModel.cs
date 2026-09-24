@@ -460,27 +460,54 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // ---- The window itself -------------------------------------------------------------
 
     /// <summary>
-    /// Switches between light and dark, and remembers the choice for the next start.
+    /// The theme mode: System (follows Windows live), Light or Dark — read from the variant the
+    /// application requests, which is what the saved choice was applied to at start.
     /// </summary>
-    /// <remarks>
-    /// The first start follows the operating system; after that the application keeps the
-    /// theme it was last left in, because a preference expressed once should not have to be
-    /// expressed every morning.
-    /// </remarks>
-    [RelayCommand]
-    private static void ToggleTheme()
+    public string ThemeMode
     {
-        if (Application.Current is not { } app)
+        get
         {
-            return;
-        }
+            ThemeVariant? requested = Application.Current?.RequestedThemeVariant;
+            if (requested == ThemeVariant.Light)
+            {
+                return ThemeModes.Light;
+            }
 
-        ThemeVariant next = app.ActualThemeVariant == ThemeVariant.Dark ? ThemeVariant.Light : ThemeVariant.Dark;
-        app.RequestedThemeVariant = next;
+            return requested == ThemeVariant.Dark ? ThemeModes.Dark : ThemeModes.System;
+        }
+    }
+
+    public string ThemeIcon => ThemeModes.Icon(ThemeMode);
+
+    public string ThemeTip => ThemeMode switch
+    {
+        ThemeModes.Light => "Theme: light — switch to dark (Ctrl+Shift+L)",
+        ThemeModes.Dark => "Theme: dark — switch to system (Ctrl+Shift+L)",
+        _ => "Theme: system, follows Windows — switch to light (Ctrl+Shift+L)",
+    };
+
+    /// <summary>Header switch and Ctrl+Shift+L: System → Light → Dark → System.</summary>
+    [RelayCommand]
+    private void CycleTheme() => SetTheme(ThemeModes.Next(ThemeMode));
+
+    /// <summary>
+    /// Sets the theme mode and remembers it for the next start; System hands the choice back
+    /// to the operating system.
+    /// </summary>
+    [RelayCommand]
+    private void SetTheme(string? mode)
+    {
+        mode = ThemeModes.Normalize(mode);
 
         UserSettings settings = UserSettings.Load();
-        settings.Theme = next == ThemeVariant.Dark ? "Dark" : "Light";
+        settings.Theme = mode == ThemeModes.System ? null : mode;
+        settings.ThemeVersion = ThemeModes.CurrentVersion;
         settings.Save();
+
+        ThemeModes.Apply(settings.Theme);
+        OnPropertyChanged(nameof(ThemeMode));
+        OnPropertyChanged(nameof(ThemeIcon));
+        OnPropertyChanged(nameof(ThemeTip));
     }
 
     /// <summary>What the status bar says about the window: how many documents, how many unsaved.</summary>

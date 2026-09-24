@@ -23,7 +23,7 @@
     <KeyBinding Gesture="Ctrl+Tab" Command="{Binding SwitchViewCommand}" />
     <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseViewCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+T" Command="{Binding ReopenClosedCommand}" />
-    <KeyBinding Gesture="Ctrl+Shift+L" Command="{Binding ToggleThemeCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+L" Command="{Binding CycleThemeCommand}" />
   </Window.KeyBindings>
 
   <Window.Resources>
@@ -94,9 +94,9 @@
             </Grid>
           </Button>
 
-          <Button Grid.Column="4" Classes="icon" Command="{Binding ToggleThemeCommand}"
-                  ToolTip.Tip="Toggle light / dark (Ctrl+Shift+L)">
-            <i:Icon Value="fa-solid fa-circle-half-stroke" FontSize="13" />
+          <Button Grid.Column="4" Classes="icon" Name="ThemeButton" Command="{Binding CycleThemeCommand}"
+                  ToolTip.Tip="{Binding ThemeTip}">
+            <i:Icon Value="{Binding ThemeIcon}" FontSize="13" />
           </Button>
           <TextBlock Grid.Column="6" Classes="mono muted" FontSize="11"
                      Text="{Binding Version, StringFormat='v{0}'}" VerticalAlignment="Center" />

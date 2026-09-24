@@ -3,7 +3,7 @@
 What changed for the user, newest version first. The version is the one shown in the
 window's header and read back from the build.
 
-## Unreleased
+## 0.1.1 — 2026-09-24
 
 ### Added
 - **Text panel**: the file as it is written, beside the tree. Selecting in the tree marks the
@@ -24,6 +24,10 @@ window's header and read back from the build.
   header doubling as the title bar with the version in it, a status bar, and a keyboard-hint
   footer. Light and dark are both deliberate palettes; the choice is remembered between starts
   (Ctrl+Shift+L toggles it).
+- Theme switch System / Light / Dark: the header button and Ctrl+Shift+L cycle through them,
+  the button shows the current mode (half circle = System, sun, moon), and the command palette
+  sets each one directly. System follows Windows live; an earlier Light/Dark choice is reset to
+  System once.
 - Fewer false JE0013 reports: a bracketed placeholder such as `"{Name}"` is no longer called a
   document.
 

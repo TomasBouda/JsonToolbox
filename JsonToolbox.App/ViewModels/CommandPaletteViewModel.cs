@@ -148,7 +148,10 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
 
         _all.Add(new PaletteItem("App", "fa-solid fa-folder-open", "Open a file…", "any size", "Ctrl+O", () => _window.OpenCommand.Execute(null)));
         _all.Add(new PaletteItem("App", "fa-solid fa-clock-rotate-left", "Reopen closed document", "the one closed last", "Ctrl+Shift+T", () => _window.ReopenClosedCommand.Execute(null)));
-        _all.Add(new PaletteItem("App", "fa-solid fa-circle-half-stroke", "Toggle light / dark", "remembered for next start", "Ctrl+Shift+L", () => _window.ToggleThemeCommand.Execute(null)));
+        _all.Add(new PaletteItem("App", "fa-solid fa-circle-half-stroke", "Cycle theme", "system → light → dark", "Ctrl+Shift+L", () => _window.CycleThemeCommand.Execute(null)));
+        _all.Add(new PaletteItem("App", ThemeModes.Icon(ThemeModes.System), "Theme: system", "follows Windows", "", () => _window.SetThemeCommand.Execute(ThemeModes.System)));
+        _all.Add(new PaletteItem("App", ThemeModes.Icon(ThemeModes.Light), "Theme: light", "remembered for next start", "", () => _window.SetThemeCommand.Execute(ThemeModes.Light)));
+        _all.Add(new PaletteItem("App", ThemeModes.Icon(ThemeModes.Dark), "Theme: dark", "remembered for next start", "", () => _window.SetThemeCommand.Execute(ThemeModes.Dark)));
     }
 
     private void Filter()
